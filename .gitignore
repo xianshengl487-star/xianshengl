@@ -4,6 +4,10 @@ artifacts/
 projects/*/generated/forge/.gradle/
 projects/*/generated/forge/build/
 projects/*/logs/
+projects/*/editor/resources/texture-editor-draft.json
+projects/*/editor/resources/model-editor-draft.json
+projects/*/editor/snapshots/
+projects/*/exports/
 *.log
 *.blockforge.zip
 .DS_Store

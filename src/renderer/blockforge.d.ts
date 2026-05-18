@@ -36,6 +36,9 @@ type ElementSet = {
   recipes: ElementModel[];
   lootTables: ElementModel[];
   functions: ElementModel[];
+  mobEffects: ElementModel[];
+  potions: ElementModel[];
+  enchantments: ElementModel[];
 };
 
 type AppSettings = {
@@ -87,6 +90,9 @@ declare global {
         createRecipe(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createLootTable(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createFunction(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
+        createMobEffect(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
+        createPotion(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
+        createEnchantment(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         save(payload: { projectDir: string; element: ElementModel }): Promise<ElementSet>;
         duplicate(payload: { projectDir: string; element: ElementModel; newId: string; zhName?: string }): Promise<{ copied: ElementModel; elements: ElementSet }>;
         delete(payload: { projectDir: string; type: ElementModel['type']; id: string }): Promise<ElementSet>;
@@ -95,15 +101,21 @@ declare global {
       resources: {
         importTexture(payload: { projectDir: string; sourceFile?: string; usage: 'item_texture' | 'block_texture'; ownerElement: string }): Promise<unknown>;
         saveTexture(payload: { projectDir: string; pngDataUrl: string; usage: 'item_texture' | 'block_texture'; ownerElement: string; textureName?: string }): Promise<unknown>;
+        importModel(payload: { projectDir: string; sourceFile?: string; usage: 'item_model' | 'block_model'; ownerElement: string; modelName?: string }): Promise<unknown>;
+        saveModel(payload: { projectDir: string; jsonText: string; usage: 'item_model' | 'block_model'; ownerElement: string; modelName?: string }): Promise<unknown>;
         duplicate(payload: { projectDir: string; resourceId: string; newName?: string }): Promise<ResourceItem>;
         delete(payload: { projectDir: string; resourceId: string }): Promise<ResourceIndex>;
         readIndex(payload: { projectDir: string }): Promise<ResourceIndex>;
         checkMissing(payload: { projectDir: string }): Promise<Diagnostic[]>;
+        readContent(payload: { projectDir: string; resourceId: string }): Promise<string>;
       };
       textureEditor: {
         openWindow(payload: { projectDir: string }): Promise<boolean>;
         readDraft(payload: { projectDir: string }): Promise<TextureEditorDraft | null>;
         saveDraft(payload: { projectDir: string; draft: TextureEditorDraft }): Promise<string>;
+      };
+      modelEditor: {
+        openWindow(payload: { projectDir: string }): Promise<boolean>;
       };
       generate: {
         forge(payload: { projectDir: string }): Promise<{ root: string; copiedResources: number; resourceDiagnostics: Diagnostic[] }>;

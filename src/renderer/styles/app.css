@@ -14,6 +14,12 @@
   --input-bg: #ffffff;
   --preview-bg: #f6f8fb;
   --accent-color: #2563eb;
+  --grass-color: #3f8f3d;
+  --dirt-color: #8b5a35;
+  --stone-color: #7a8490;
+  --ore-color: #2f7dd3;
+  --redstone-color: #b3261e;
+  --plank-color: #b77938;
   --surface-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 26px rgba(15, 23, 42, 0.05);
   --shell-topbar-height: 60px;
   --shell-bottom-height: 220px;
@@ -142,7 +148,9 @@ label {
   gap: 16px;
   padding: 0 14px;
   border-bottom: 1px solid var(--border-color);
-  background: var(--topbar-bg);
+  background:
+    linear-gradient(90deg, rgba(63, 143, 61, 0.10), rgba(47, 125, 211, 0.08) 42%, rgba(179, 38, 30, 0.07)),
+    var(--topbar-bg);
 }
 
 .brand {
@@ -152,8 +160,23 @@ label {
   min-width: 270px;
 }
 
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .brand strong {
   color: var(--text-color);
+  letter-spacing: 0;
+  line-height: 1.05;
+}
+
+.brand small {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted-color);
+  font-size: 11px;
 }
 
 .brand span {
@@ -203,6 +226,53 @@ label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.minecraft-cube {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+  flex: 0 0 auto;
+  border: 2px solid rgba(31, 41, 55, 0.28);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 255, 255, 0.25),
+    inset 0 -4px 0 rgba(0, 0, 0, 0.12),
+    0 4px 10px rgba(15, 23, 42, 0.12);
+  image-rendering: pixelated;
+}
+
+.minecraft-cube.grass {
+  background:
+    linear-gradient(#5ead44 0 35%, transparent 35%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.12) 0 4px, transparent 4px 8px),
+    var(--dirt-color);
+}
+
+.minecraft-cube.stone {
+  background:
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.16) 0 5px, transparent 5px 10px),
+    var(--stone-color);
+}
+
+.minecraft-cube.ore {
+  background:
+    radial-gradient(circle at 34% 38%, #69d8ff 0 10%, transparent 11%),
+    radial-gradient(circle at 70% 66%, #69d8ff 0 9%, transparent 10%),
+    var(--stone-color);
+}
+
+.minecraft-cube.redstone {
+  background:
+    radial-gradient(circle at 34% 36%, #ff6b5f 0 12%, transparent 13%),
+    radial-gradient(circle at 68% 62%, #ff6b5f 0 10%, transparent 11%),
+    #7a2f2b;
+}
+
+.minecraft-cube.plank {
+  background:
+    repeating-linear-gradient(90deg, rgba(73, 41, 18, 0.24) 0 3px, transparent 3px 11px),
+    var(--plank-color);
 }
 
 .workspace {
@@ -396,6 +466,61 @@ label {
   font-size: 12px;
 }
 
+.workbench-hero {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  min-height: 132px;
+  padding: 14px;
+  border: 1px solid var(--border-strong-color);
+  border-radius: 8px;
+  background:
+    linear-gradient(135deg, rgba(63, 143, 61, 0.12), rgba(47, 125, 211, 0.08) 46%, rgba(183, 121, 56, 0.11)),
+    #ffffff;
+  box-shadow: var(--surface-shadow);
+}
+
+.workbench-hero strong,
+.workbench-hero span {
+  display: block;
+}
+
+.workbench-hero strong {
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.workbench-hero span {
+  margin-top: 7px;
+  color: var(--muted-color);
+  line-height: 1.6;
+}
+
+.block-mosaic {
+  display: grid;
+  grid-template-columns: repeat(3, 28px);
+  grid-template-rows: repeat(2, 28px);
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid rgba(31, 41, 55, 0.18);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.74);
+}
+
+.block {
+  border: 2px solid rgba(31, 41, 55, 0.22);
+  border-radius: 3px;
+  box-shadow: inset 0 3px 0 rgba(255, 255, 255, 0.22), inset 0 -4px 0 rgba(0, 0, 0, 0.12);
+}
+
+.block.grass { background: linear-gradient(#5ead44 0 35%, var(--dirt-color) 35%); }
+.block.dirt { background: repeating-linear-gradient(45deg, #9c6840 0 5px, #7b4c2e 5px 10px); }
+.block.stone { background: repeating-linear-gradient(45deg, #8d97a3 0 6px, #6e7782 6px 12px); }
+.block.ore { background: radial-gradient(circle at 30% 35%, #74d7ff 0 10%, transparent 11%), radial-gradient(circle at 70% 65%, #74d7ff 0 9%, transparent 10%), #77818d; }
+.block.redstone { background: radial-gradient(circle at 32% 38%, #ff6b5f 0 12%, transparent 13%), radial-gradient(circle at 70% 62%, #ff6b5f 0 10%, transparent 11%), #76302c; }
+.block.plank { background: repeating-linear-gradient(90deg, #c98b45 0 8px, #a76931 8px 16px); }
+
 .design-hero {
   display: grid;
   gap: 12px;
@@ -440,7 +565,8 @@ label {
 .next-action-list,
 .principle-list,
 .task-list,
-.quick-suggestion-grid {
+.quick-suggestion-grid,
+.kit-grid {
   display: grid;
   gap: 10px;
   margin-top: 14px;
@@ -568,6 +694,41 @@ label {
 .quick-suggestion-grid {
   grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
 }
+
+.kit-grid {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+
+.kit-card {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 5px 10px;
+  align-items: center;
+  min-height: 92px;
+  padding: 12px;
+  text-align: left;
+  background: #ffffff;
+}
+
+.kit-card .minecraft-cube {
+  grid-row: span 2;
+}
+
+.kit-card strong,
+.kit-card small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.kit-card small {
+  color: var(--muted-color);
+  line-height: 1.45;
+}
+
+.kit-card.grass { border-color: rgba(63, 143, 61, 0.45); }
+.kit-card.stone { border-color: rgba(122, 132, 144, 0.55); }
+.kit-card.ore { border-color: rgba(47, 125, 211, 0.45); }
+.kit-card.redstone { border-color: rgba(179, 38, 30, 0.42); }
 
 .status-pill {
   padding: 2px 8px;
@@ -714,10 +875,32 @@ label {
   line-height: 1.45;
 }
 
+.model-editor {
+  min-height: 360px;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .quick-editor {
   margin-top: 12px;
   padding-top: 10px;
   border-top: 1px solid var(--border-color);
+}
+
+.nested-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.nested-card {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .hint {
@@ -983,17 +1166,22 @@ label {
   background-position: 0 0, 0 4px, 4px -4px, -4px 0;
 }
 
-.texture-editor-mode .workspace {
+.texture-editor-mode .workspace,
+.model-editor-mode .workspace {
   grid-template-columns: minmax(0, 1fr);
 }
 
 .texture-editor-mode .sidebar,
 .texture-editor-mode .rightbar,
-.texture-editor-mode .bottom-panel {
+.texture-editor-mode .bottom-panel,
+.model-editor-mode .sidebar,
+.model-editor-mode .rightbar,
+.model-editor-mode .bottom-panel {
   display: none;
 }
 
-.texture-editor-mode .editor-area {
+.texture-editor-mode .editor-area,
+.model-editor-mode .editor-area {
   width: 100%;
 }
 
@@ -1003,6 +1191,14 @@ label {
 
 .texture-editor-mode .texture-canvas {
   width: min(980px, 100%);
+}
+
+.model-editor-mode .view-grid.two {
+  grid-template-columns: minmax(360px, 460px) minmax(520px, 1fr);
+}
+
+.model-editor-mode .model-editor {
+  min-height: 560px;
 }
 
 .logic-view {

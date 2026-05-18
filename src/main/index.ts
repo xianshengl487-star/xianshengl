@@ -8,6 +8,9 @@ import {
   createFunctionElement,
   createItem,
   createLootTable,
+  createEnchantment,
+  createMobEffect,
+  createPotion,
   createRecipe,
   deleteElement,
   duplicateElement,
@@ -15,7 +18,7 @@ import {
   loadElements,
   saveElement
 } from '../core/elements/elementService';
-import { checkResources, deleteResource, duplicateTextureResource, importTexture, readResourceIndex, saveTextureDataUrl } from '../core/resources/resourceService';
+import { checkResources, deleteResource, duplicateResource, importModelJson, importTexture, readResourceContent, readResourceIndex, saveModelJson, saveTextureDataUrl } from '../core/resources/resourceService';
 import { generateForgeProject } from '../core/generator/forge/forgeGenerator';
 import { buildForgeJar } from '../core/build/buildService';
 import { builtInNodeTypes, createNode } from '../core/logic/nodeRegistry';
@@ -139,6 +142,28 @@ function openTextureEditorWindow(projectDir: string) {
   return win;
 }
 
+function openModelEditorWindow(projectDir: string) {
+  const win = new BrowserWindow({
+    title: 'BlockForge 3D 模型编辑器',
+    width: 1320,
+    height: 960,
+    minWidth: 1000,
+    minHeight: 760,
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false
+    }
+  });
+  const query = `modelEditor=1&projectDir=${encodeURIComponent(projectDir)}`;
+  if (process.env.NODE_ENV === 'development') {
+    void win.loadURL(rendererTarget(query));
+  } else {
+    void win.loadFile(rendererTarget(), { query: { modelEditor: '1', projectDir } });
+  }
+  return win;
+}
+
 function sendCommand(command: string) {
   const win = BrowserWindow.getFocusedWindow() || BrowserWindow.getAllWindows()[0];
   win?.webContents.send('app:command', command);
@@ -194,9 +219,11 @@ async function createSampleProject(projectDir: string) {
   item.properties.attackDamage = 5;
   item.properties.attackSpeed = -2.2;
   item.properties.texture = 'ice_wand';
+  item.properties.model = 'ice_wand_model';
   item.properties.rightClickLogic = 'item:ice_wand';
   const block = createBlock(project, 'frost_block', '霜冻方块');
   block.properties.textureAll = 'frost_block';
+  block.properties.model = 'frost_block_model';
   const recipe = createRecipe(project, 'ice_wand', '冰霜法杖配方');
   recipe.properties.ingredients = ['minecraft:stick', 'minecraft:snowball'];
   recipe.properties.result = `${project.modId}:ice_wand`;
@@ -205,8 +232,17 @@ async function createSampleProject(projectDir: string) {
   loot.properties.drop = `${project.modId}:frost_block`;
   const fn = createFunctionElement(project, 'ice_wand_cast', '冰霜法杖施法');
   fn.properties.commands = 'effect give @p minecraft:slowness 3 1\nparticle minecraft:snowflake ~ ~1 ~ 0.6 0.8 0.6 0.02 40';
+  const effect = createMobEffect(project, 'frostbite', '霜寒状态');
+  effect.properties.category = 'harmful';
+  effect.properties.color = '#8fd8ff';
+  effect.properties.description = '降低目标速度的冰霜状态效果。';
+  const potion = createPotion(project, 'frost_potion', '霜寒药水');
+  potion.properties.effects = [{ effect: `${project.modId}:frostbite`, duration: 160, amplifier: 1, visible: true, showIcon: true }];
+  const enchantment = createEnchantment(project, 'frost_affinity', '霜寒亲和');
+  enchantment.properties.slots = ['mainhand'];
+  enchantment.properties.description = '让武器更适合触发冰霜主题逻辑。';
 
-  for (const element of [item, block, recipe, loot, fn]) await saveElement(projectDir, element);
+  for (const element of [item, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
 
   const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'blockforge-sample-'));
   const itemTexture = path.join(tmpDir, 'ice_wand.png');
@@ -215,6 +251,8 @@ async function createSampleProject(projectDir: string) {
   await fs.writeFile(blockTexture, sampleTexturePng);
   await importTexture(projectDir, itemTexture, 'item_texture', 'item:ice_wand', project.modId);
   await importTexture(projectDir, blockTexture, 'block_texture', 'block:frost_block', project.modId);
+  await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:item/handheld', textures: { layer0: `${project.modId}:item/ice_wand` } }, null, 2), 'item_model', 'item:ice_wand', project.modId, 'ice_wand_model');
+  await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: `${project.modId}:block/frost_block` } }, null, 2), 'block_model', 'block:frost_block', project.modId, 'frost_block_model');
 
   const graph = createDefaultLogicGraph('Ice wand right click', 'item:ice_wand');
   await saveLogicGraph(projectDir, graph);
@@ -259,6 +297,9 @@ function registerIpc() {
   ipcMain.handle('elements:createRecipe', async (_event, input: { projectDir: string; id: string; zhName: string }) => createRecipe(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createLootTable', async (_event, input: { projectDir: string; id: string; zhName: string }) => createLootTable(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createFunction', async (_event, input: { projectDir: string; id: string; zhName: string }) => createFunctionElement(await readProject(input.projectDir), input.id, input.zhName));
+  ipcMain.handle('elements:createMobEffect', async (_event, input: { projectDir: string; id: string; zhName: string }) => createMobEffect(await readProject(input.projectDir), input.id, input.zhName));
+  ipcMain.handle('elements:createPotion', async (_event, input: { projectDir: string; id: string; zhName: string }) => createPotion(await readProject(input.projectDir), input.id, input.zhName));
+  ipcMain.handle('elements:createEnchantment', async (_event, input: { projectDir: string; id: string; zhName: string }) => createEnchantment(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:save', async (_event, input: { projectDir: string; element: ElementModel }) => {
     await saveElement(input.projectDir, input.element);
     return loadElementSet(input.projectDir);
@@ -292,13 +333,32 @@ function registerIpc() {
   });
   ipcMain.handle('resources:duplicate', async (_event, input: { projectDir: string; resourceId: string; newName?: string }) => {
     const project = await readProject(input.projectDir);
-    return duplicateTextureResource(input.projectDir, input.resourceId, project.modId, input.newName);
+    return duplicateResource(input.projectDir, input.resourceId, project.modId, input.newName);
   });
   ipcMain.handle('resources:delete', async (_event, input: { projectDir: string; resourceId: string }) => deleteResource(input.projectDir, input.resourceId));
   ipcMain.handle('resources:readIndex', async (_event, input: { projectDir: string }) => readResourceIndex(input.projectDir));
   ipcMain.handle('resources:checkMissing', async (_event, input: { projectDir: string }) => checkResources(input.projectDir));
+  ipcMain.handle('resources:readContent', async (_event, input: { projectDir: string; resourceId: string }) => readResourceContent(input.projectDir, input.resourceId));
+  ipcMain.handle('resources:importModel', async (_event, input: { projectDir: string; sourceFile?: string; usage: 'item_model' | 'block_model'; ownerElement: string; modelName?: string }) => {
+    const project = await readProject(input.projectDir);
+    let sourceFile = input.sourceFile;
+    if (!sourceFile) {
+      const picked = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'JSON 模型', extensions: ['json'] }] });
+      if (picked.canceled || picked.filePaths.length === 0) return null;
+      sourceFile = picked.filePaths[0];
+    }
+    return importModelJson(input.projectDir, sourceFile, input.usage, input.ownerElement, project.modId, input.modelName);
+  });
+  ipcMain.handle('resources:saveModel', async (_event, input: { projectDir: string; jsonText: string; usage: 'item_model' | 'block_model'; ownerElement: string; modelName?: string }) => {
+    const project = await readProject(input.projectDir);
+    return saveModelJson(input.projectDir, input.jsonText, input.usage, input.ownerElement, project.modId, input.modelName);
+  });
   ipcMain.handle('textureEditor:openWindow', async (_event, input: { projectDir: string }) => {
     openTextureEditorWindow(input.projectDir);
+    return true;
+  });
+  ipcMain.handle('modelEditor:openWindow', async (_event, input: { projectDir: string }) => {
+    openModelEditorWindow(input.projectDir);
     return true;
   });
   ipcMain.handle('textureEditor:readDraft', async (_event, input: { projectDir: string }) => {

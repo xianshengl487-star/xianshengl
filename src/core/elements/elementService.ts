@@ -3,9 +3,12 @@ import path from 'node:path';
 import type {
   BlockElement,
   ElementModel,
+  EnchantmentElement,
   FunctionElement,
   ItemElement,
   LootTableElement,
+  MobEffectElement,
+  PotionElement,
   RecipeElement
 } from '../../shared/types/elements';
 import type { ProjectModel } from '../../shared/types/project';
@@ -47,7 +50,8 @@ export function createItem(project: ProjectModel, id: string, zhName: string): I
       foodSaturation: 0.3,
       alwaysEat: false,
       fireResistant: false,
-      creativeTab: `${project.modId}_tab`
+      creativeTab: `${project.modId}_tab`,
+      model: ''
     },
   };
 }
@@ -56,7 +60,56 @@ export function createBlock(project: ProjectModel, id: string, zhName: string): 
   return {
     ...baseElement(project, id, zhName),
     type: 'block',
-    properties: { hardness: 3, resistance: 3, soundType: 'STONE', lightLevel: 0, requiresCorrectTool: true, creativeTab: `${project.modId}_tab` },
+    properties: { hardness: 3, resistance: 3, soundType: 'STONE', lightLevel: 0, requiresCorrectTool: true, creativeTab: `${project.modId}_tab`, model: '' },
+  };
+}
+
+export function createMobEffect(project: ProjectModel, id: string, zhName: string): MobEffectElement {
+  return {
+    ...baseElement(project, id, zhName),
+    type: 'mob_effect',
+    properties: {
+      category: 'beneficial',
+      color: '#7dd3fc',
+      instant: false,
+      ambient: false,
+      visible: true,
+      showIcon: true,
+      description: 'BlockForge 自定义状态效果'
+    }
+  };
+}
+
+export function createPotion(project: ProjectModel, id: string, zhName: string): PotionElement {
+  return {
+    ...baseElement(project, id, zhName),
+    type: 'potion',
+    properties: {
+      potionKind: 'drinkable',
+      basePotion: 'minecraft:awkward',
+      effects: [],
+      color: '#7dd3fc',
+      creativeTab: `${project.modId}_tab`
+    }
+  };
+}
+
+export function createEnchantment(project: ProjectModel, id: string, zhName: string): EnchantmentElement {
+  return {
+    ...baseElement(project, id, zhName),
+    type: 'enchantment',
+    properties: {
+      rarity: 'rare',
+      maxLevel: 3,
+      minCost: 1,
+      maxCost: 25,
+      treasureOnly: false,
+      curse: false,
+      discoverable: true,
+      slots: ['mainhand'],
+      description: 'BlockForge 自定义附魔',
+      incompatibleWith: []
+    }
   };
 }
 
@@ -103,6 +156,9 @@ export function folderForElementType(type: ElementModel['type']): string {
   if (type === 'recipe') return 'recipes';
   if (type === 'loot_table') return 'loot_tables';
   if (type === 'function') return 'functions';
+  if (type === 'mob_effect') return 'mob_effects';
+  if (type === 'potion') return 'potions';
+  if (type === 'enchantment') return 'enchantments';
   return `${type}s`;
 }
 
@@ -170,12 +226,15 @@ export async function loadElements<T extends ElementModel<unknown>>(projectDir: 
 }
 
 export async function loadElementSet(projectDir: string) {
-  const [items, blocks, recipes, lootTables, functions] = await Promise.all([
+  const [items, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments] = await Promise.all([
     loadElements<ItemElement>(projectDir, 'items'),
     loadElements<BlockElement>(projectDir, 'blocks'),
     loadElements<RecipeElement>(projectDir, 'recipes'),
     loadElements<LootTableElement>(projectDir, 'loot_tables'),
-    loadElements<FunctionElement>(projectDir, 'functions')
+    loadElements<FunctionElement>(projectDir, 'functions'),
+    loadElements<MobEffectElement>(projectDir, 'mob_effects'),
+    loadElements<PotionElement>(projectDir, 'potions'),
+    loadElements<EnchantmentElement>(projectDir, 'enchantments')
   ]);
-  return { items, blocks, recipes, lootTables, functions };
+  return { items, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments };
 }

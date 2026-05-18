@@ -2,17 +2,30 @@ import type { AiChatMessage, AiProjectChangePlan, AiProviderConfig } from '../..
 
 export type ChatMessage = AiChatMessage;
 
+function openAiBaseUrl(config: AiProviderConfig): string {
+  const baseUrl = config.apiBaseUrl.replace(/\/$/, '');
+  return baseUrl.endsWith('/v1') ? baseUrl : `${baseUrl}/v1`;
+}
+
+function authHeaders(config: AiProviderConfig): Record<string, string> {
+  if (!config.apiKey) return { ...(config.headers || {}) };
+  return {
+    Authorization: `Bearer ${config.apiKey}`,
+    ...(config.provider === 'mimo' ? { 'api-key': config.apiKey } : {}),
+    ...(config.headers || {})
+  };
+}
+
 export async function chat(config: AiProviderConfig, messages: ChatMessage[]): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), config.timeoutMs || 60000);
   try {
-    const response = await fetch(`${config.apiBaseUrl.replace(/\/$/, '')}/v1/chat/completions`, {
+    const response = await fetch(`${openAiBaseUrl(config)}/chat/completions`, {
       method: 'POST',
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-        ...(config.headers || {})
+        ...authHeaders(config)
       },
       body: JSON.stringify({
         model: config.model,
@@ -37,6 +50,7 @@ export async function testConnection(config: AiProviderConfig): Promise<boolean>
 
 export async function listModels(config: AiProviderConfig): Promise<string[]> {
   const baseUrl = config.apiBaseUrl.replace(/\/$/, '');
+  const openAiUrl = openAiBaseUrl(config);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), Math.min(config.timeoutMs || 60000, 15000));
   try {
@@ -47,12 +61,9 @@ export async function listModels(config: AiProviderConfig): Promise<string[]> {
         return (data.models || []).map(model => model.name).filter(Boolean) as string[];
       }
     }
-    const response = await fetch(`${baseUrl}/v1/models`, {
+    const response = await fetch(`${openAiUrl}/models`, {
       signal: controller.signal,
-      headers: {
-        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
-        ...(config.headers || {})
-      }
+      headers: authHeaders(config)
     });
     if (!response.ok) throw new Error(`模型列表读取失败：${response.status} ${await response.text()}`);
     const data = await response.json() as { data?: Array<{ id?: string }> };

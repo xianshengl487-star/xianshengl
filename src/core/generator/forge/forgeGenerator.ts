@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ProjectModel } from '../../../shared/types/project';
-import type { BlockElement, FunctionElement, ItemElement, LootTableElement, RecipeElement } from '../../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement } from '../../../shared/types/elements';
 import type { BlockForgeIR } from '../../../shared/types/logic';
 import { copyResourcesToForge } from '../../resources/resourceService';
 import { generateCooldowns, generateForgeEventHandler, generateGameActions, generateItemUtils } from './forgeEventGenerator';
@@ -21,6 +21,9 @@ export interface ForgeGenerateInput {
   recipes?: RecipeElement[];
   lootTables?: LootTableElement[];
   functions?: FunctionElement[];
+  mobEffects?: MobEffectElement[];
+  potions?: PotionElement[];
+  enchantments?: EnchantmentElement[];
   logicIR?: BlockForgeIR[];
 }
 
@@ -128,6 +131,72 @@ function lootTableJson(project: ProjectModel, loot: LootTableElement): unknown {
       functions
     }]
   };
+}
+
+function javaColorInt(value: string | undefined, fallback = '#7dd3fc'): string {
+  const normalized = String(value || fallback).trim().replace(/^#/, '');
+  const color = /^[0-9a-fA-F]{6}$/.test(normalized) ? normalized : fallback.replace(/^#/, '');
+  return `0x${color.toUpperCase()}`;
+}
+
+function mobEffectCategoryCode(effect: MobEffectElement): string {
+  const category = effect.properties.category || 'beneficial';
+  if (category === 'harmful') return 'MobEffectCategory.HARMFUL';
+  if (category === 'neutral') return 'MobEffectCategory.NEUTRAL';
+  return 'MobEffectCategory.BENEFICIAL';
+}
+
+function potionEffectCode(project: ProjectModel, spec: PotionEffectSpec): string {
+  const effectId = resourceId(project.modId, spec.effect || 'minecraft:speed');
+  const duration = Math.max(1, intOr(spec.duration, 200));
+  const amplifier = Math.max(0, intOr(spec.amplifier, 0));
+  return `new MobEffectInstance(effect("${effectId}"), ${duration}, ${amplifier}, ${Boolean(spec.ambient)}, ${spec.visible !== false}, ${spec.showIcon !== false})`;
+}
+
+function enchantmentRarityCode(enchantment: EnchantmentElement): string {
+  const rarity = String(enchantment.properties.rarity || 'rare').toUpperCase();
+  return `Enchantment.Rarity.${rarity === 'VERY_RARE' ? 'VERY_RARE' : rarity}`;
+}
+
+function enchantmentSlots(enchantment: EnchantmentElement): EnchantmentSlot[] {
+  const slots: EnchantmentSlot[] = enchantment.properties.slots?.length ? enchantment.properties.slots : ['mainhand'];
+  return slots.includes('any') ? ['mainhand', 'offhand', 'head', 'chest', 'legs', 'feet'] : slots;
+}
+
+function enchantmentCategoryCode(enchantment: EnchantmentElement): string {
+  const slots = enchantmentSlots(enchantment);
+  if (slots.every(slot => ['head', 'chest', 'legs', 'feet'].includes(slot))) return 'EnchantmentCategory.ARMOR';
+  if (slots.includes('head') && slots.length === 1) return 'EnchantmentCategory.ARMOR_HEAD';
+  if (slots.includes('chest') && slots.length === 1) return 'EnchantmentCategory.ARMOR_CHEST';
+  if (slots.includes('legs') && slots.length === 1) return 'EnchantmentCategory.ARMOR_LEGS';
+  if (slots.includes('feet') && slots.length === 1) return 'EnchantmentCategory.ARMOR_FEET';
+  if (slots.includes('mainhand')) return 'EnchantmentCategory.WEAPON';
+  return 'EnchantmentCategory.BREAKABLE';
+}
+
+function equipmentSlotCode(slot: EnchantmentSlot): string {
+  if (slot === 'offhand') return 'EquipmentSlot.OFFHAND';
+  if (slot === 'head') return 'EquipmentSlot.HEAD';
+  if (slot === 'chest') return 'EquipmentSlot.CHEST';
+  if (slot === 'legs') return 'EquipmentSlot.LEGS';
+  if (slot === 'feet') return 'EquipmentSlot.FEET';
+  return 'EquipmentSlot.MAINHAND';
+}
+
+function enchantmentFactoryCode(enchantment: EnchantmentElement): string {
+  const props = enchantment.properties;
+  const slots = enchantmentSlots(enchantment).map(equipmentSlotCode).join(', ');
+  const maxLevel = Math.max(1, intOr(props.maxLevel, 1));
+  const minCost = Math.max(1, intOr(props.minCost, 1));
+  const maxCost = Math.max(minCost, intOr(props.maxCost, 25));
+  return `new Enchantment(${enchantmentRarityCode(enchantment)}, ${enchantmentCategoryCode(enchantment)}, new EquipmentSlot[] { ${slots} }) {
+        @Override public int getMaxLevel() { return ${maxLevel}; }
+        @Override public int getMinCost(int level) { return ${minCost} + (level - 1) * 10; }
+        @Override public int getMaxCost(int level) { return ${maxCost} + (level - 1) * 10; }
+        @Override public boolean isTreasureOnly() { return ${Boolean(props.treasureOnly)}; }
+        @Override public boolean isCurse() { return ${Boolean(props.curse)}; }
+        @Override public boolean isDiscoverable() { return ${props.discoverable !== false}; }
+    }`;
 }
 
 function deployCommandsMarkdown(project: ProjectModel): string {
@@ -289,7 +358,7 @@ Write-Host "[BlockForge] 请启动 Minecraft Forge ${project.minecraftVersion} �
 }
 
 export async function generateForgeProject(input: ForgeGenerateInput): Promise<{ root: string; copiedResources: number }> {
-  const { projectDir, project, items, blocks, recipes = [], lootTables = [], functions = [], logicIR = [] } = input;
+  const { projectDir, project, items, blocks, recipes = [], lootTables = [], functions = [], mobEffects = [], potions = [], enchantments = [], logicIR = [] } = input;
   const root = path.join(projectDir, 'generated/forge');
   const resolvedRoot = path.resolve(root);
   const resolvedProject = path.resolve(projectDir);
@@ -308,11 +377,17 @@ export async function generateForgeProject(input: ForgeGenerateInput): Promise<{
   await write(path.join(root, 'blockforge-deploy-local.ps1'), deployLocalScript(project));
 
   const modClass = className(project.modId) + 'Mod';
-  await write(path.join(pkgDir, `${modClass}.java`), `package ${project.packageName};\n\nimport com.mojang.logging.LogUtils;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;\nimport org.slf4j.Logger;\nimport ${project.packageName}.registry.ModItems;\nimport ${project.packageName}.registry.ModBlocks;\nimport ${project.packageName}.registry.ModCreativeTabs;\n\n@Mod(${modClass}.MODID)\npublic class ${modClass} {\n    public static final String MODID = "${project.modId}";\n    public static final Logger LOGGER = LogUtils.getLogger();\n\n    public ${modClass}() {\n        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();\n        ModBlocks.register(bus);\n        ModItems.register(bus);\n        ModCreativeTabs.register(bus);\n    }\n}\n`);
+  await write(path.join(pkgDir, `${modClass}.java`), `package ${project.packageName};\n\nimport com.mojang.logging.LogUtils;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;\nimport org.slf4j.Logger;\nimport ${project.packageName}.registry.ModItems;\nimport ${project.packageName}.registry.ModBlocks;\nimport ${project.packageName}.registry.ModCreativeTabs;\nimport ${project.packageName}.registry.ModMobEffects;\nimport ${project.packageName}.registry.ModPotions;\nimport ${project.packageName}.registry.ModEnchantments;\n\n@Mod(${modClass}.MODID)\npublic class ${modClass} {\n    public static final String MODID = "${project.modId}";\n    public static final Logger LOGGER = LogUtils.getLogger();\n\n    public ${modClass}() {\n        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();\n        ModBlocks.register(bus);\n        ModItems.register(bus);\n        ModMobEffects.register(bus);\n        ModPotions.register(bus);\n        ModEnchantments.register(bus);\n        ModCreativeTabs.register(bus);\n    }\n}\n`);
 
   await write(path.join(pkgDir, 'registry/ModItems.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.food.FoodProperties;\nimport net.minecraft.world.item.AxeItem;\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.item.HoeItem;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.PickaxeItem;\nimport net.minecraft.world.item.ShovelItem;\nimport net.minecraft.world.item.SwordItem;\nimport net.minecraft.world.item.Tiers;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport ${project.packageName}.${modClass};\n\npublic class ModItems {\n    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ${modClass}.MODID);\n${items.map(i => `    public static final RegistryObject<Item> ${constantName(i.id)} = ITEMS.register("${i.id}", () -> ${itemFactoryCode(i)});`).join('\n')}\n${blocks.map(b => `    public static final RegistryObject<Item> ${constantName(b.id)}_ITEM = ITEMS.register("${b.id}", () -> new BlockItem(ModBlocks.${constantName(b.id)}.get(), new Item.Properties()));`).join('\n')}\n\n    public static void register(IEventBus bus) { ITEMS.register(bus); }\n}\n`);
 
   await write(path.join(pkgDir, 'registry/ModBlocks.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.level.block.Block;\nimport net.minecraft.world.level.block.SoundType;\nimport net.minecraft.world.level.block.state.BlockBehaviour;\nimport net.minecraft.world.level.material.MapColor;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport ${project.packageName}.${modClass};\n\npublic class ModBlocks {\n    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, ${modClass}.MODID);\n${blocks.map(b => `    public static final RegistryObject<Block> ${constantName(b.id)} = BLOCKS.register("${b.id}", () -> new Block(${blockPropertiesCode(b)}));`).join('\n')}\n\n    public static void register(IEventBus bus) { BLOCKS.register(bus); }\n}\n`);
+
+  await write(path.join(pkgDir, 'registry/ModMobEffects.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.effect.MobEffect;\nimport net.minecraft.world.effect.MobEffectCategory;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport ${project.packageName}.${modClass};\n\npublic class ModMobEffects {\n    public static final DeferredRegister<MobEffect> MOB_EFFECTS = DeferredRegister.create(ForgeRegistries.MOB_EFFECTS, ${modClass}.MODID);\n${mobEffects.map(effect => `    public static final RegistryObject<MobEffect> ${constantName(effect.id)} = MOB_EFFECTS.register("${effect.id}", () -> new MobEffect(${mobEffectCategoryCode(effect)}, ${javaColorInt(effect.properties.color)}) {});`).join('\n')}\n\n    public static void register(IEventBus bus) { MOB_EFFECTS.register(bus); }\n}\n`);
+
+  await write(path.join(pkgDir, 'registry/ModPotions.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.effect.MobEffect;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.item.alchemy.Potion;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport ${project.packageName}.${modClass};\n\npublic class ModPotions {\n    public static final DeferredRegister<Potion> POTIONS = DeferredRegister.create(ForgeRegistries.POTIONS, ${modClass}.MODID);\n${potions.map(potion => `    public static final RegistryObject<Potion> ${constantName(potion.id)} = POTIONS.register("${potion.id}", () -> new Potion("${potion.id}", ${(potion.properties.effects?.length ? potion.properties.effects : [{ effect: 'minecraft:speed', duration: 200, amplifier: 0 }]).map(spec => potionEffectCode(project, spec)).join(', ')}));`).join('\n')}\n\n    private static MobEffect effect(String id) {\n        return ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation(id));\n    }\n\n    public static void register(IEventBus bus) { POTIONS.register(bus); }\n}\n`);
+
+  await write(path.join(pkgDir, 'registry/ModEnchantments.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.entity.EquipmentSlot;\nimport net.minecraft.world.item.enchantment.Enchantment;\nimport net.minecraft.world.item.enchantment.EnchantmentCategory;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport ${project.packageName}.${modClass};\n\npublic class ModEnchantments {\n    public static final DeferredRegister<Enchantment> ENCHANTMENTS = DeferredRegister.create(ForgeRegistries.ENCHANTMENTS, ${modClass}.MODID);\n${enchantments.map(enchantment => `    public static final RegistryObject<Enchantment> ${constantName(enchantment.id)} = ENCHANTMENTS.register("${enchantment.id}", () -> ${enchantmentFactoryCode(enchantment)});`).join('\n')}\n\n    public static void register(IEventBus bus) { ENCHANTMENTS.register(bus); }\n}\n`);
 
   await write(path.join(pkgDir, 'registry/ModCreativeTabs.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.core.registries.Registries;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.item.CreativeModeTab;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Items;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.RegistryObject;\nimport ${project.packageName}.${modClass};\n\npublic class ModCreativeTabs {\n    public static final DeferredRegister<CreativeModeTab> TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, ${modClass}.MODID);\n    public static final RegistryObject<CreativeModeTab> MAIN_TAB = TABS.register("${project.modId}_tab", () -> CreativeModeTab.builder()\n        .title(Component.translatable("itemGroup.${project.modId}"))\n        .icon(() -> new ItemStack(Items.CRAFTING_TABLE))\n        .displayItems((params, output) -> {\n${items.map(i => `            output.accept(ModItems.${constantName(i.id)}.get());`).join('\n')}\n${blocks.map(b => `            output.accept(ModItems.${constantName(b.id)}_ITEM.get());`).join('\n')}\n        }).build());\n    public static void register(IEventBus bus) { TABS.register(bus); }\n}\n`);
 
@@ -333,14 +408,31 @@ export async function generateForgeProject(input: ForgeGenerateInput): Promise<{
   const en: Record<string, string> = { [`itemGroup.${project.modId}`]: project.displayName };
   for (const i of items) { zh[`item.${project.modId}.${i.id}`] = i.displayName.zh_cn; en[`item.${project.modId}.${i.id}`] = i.displayName.en_us; }
   for (const b of blocks) { zh[`block.${project.modId}.${b.id}`] = b.displayName.zh_cn; en[`block.${project.modId}.${b.id}`] = b.displayName.en_us; }
+  for (const effect of mobEffects) { zh[`effect.${project.modId}.${effect.id}`] = effect.displayName.zh_cn; en[`effect.${project.modId}.${effect.id}`] = effect.displayName.en_us; }
+  for (const potion of potions) {
+    for (const prefix of ['item.minecraft.potion.effect', 'item.minecraft.splash_potion.effect', 'item.minecraft.lingering_potion.effect', 'item.minecraft.tipped_arrow.effect']) {
+      zh[`${prefix}.${potion.id}`] = potion.displayName.zh_cn;
+      en[`${prefix}.${potion.id}`] = potion.displayName.en_us;
+    }
+  }
+  for (const enchantment of enchantments) { zh[`enchantment.${project.modId}.${enchantment.id}`] = enchantment.displayName.zh_cn; en[`enchantment.${project.modId}.${enchantment.id}`] = enchantment.displayName.en_us; }
   await writeJson(path.join(resDir, `assets/${project.modId}/lang/zh_cn.json`), zh);
   await writeJson(path.join(resDir, `assets/${project.modId}/lang/en_us.json`), en);
 
-  for (const i of items) await writeJson(path.join(resDir, `assets/${project.modId}/models/item/${i.id}.json`), { parent: 'item/generated', textures: { layer0: `${project.modId}:item/${i.properties.texture || i.id}` } });
+  for (const i of items) {
+    const modelName = i.properties.model?.trim();
+    const value = modelName && modelName !== i.id
+      ? { parent: `${project.modId}:item/${modelName}` }
+      : { parent: 'item/generated', textures: { layer0: `${project.modId}:item/${i.properties.texture || i.id}` } };
+    await writeJson(path.join(resDir, `assets/${project.modId}/models/item/${i.id}.json`), value);
+  }
   for (const b of blocks) {
-    await writeJson(path.join(resDir, `assets/${project.modId}/models/block/${b.id}.json`), { parent: 'block/cube_all', textures: { all: `${project.modId}:block/${b.properties.textureAll || b.id}` } });
-    await writeJson(path.join(resDir, `assets/${project.modId}/models/item/${b.id}.json`), { parent: `${project.modId}:block/${b.id}` });
-    await writeJson(path.join(resDir, `assets/${project.modId}/blockstates/${b.id}.json`), { variants: { '': { model: `${project.modId}:block/${b.id}` } } });
+    const modelName = b.properties.model?.trim() || b.id;
+    if (modelName === b.id) {
+      await writeJson(path.join(resDir, `assets/${project.modId}/models/block/${b.id}.json`), { parent: 'block/cube_all', textures: { all: `${project.modId}:block/${b.properties.textureAll || b.id}` } });
+    }
+    await writeJson(path.join(resDir, `assets/${project.modId}/models/item/${b.id}.json`), { parent: `${project.modId}:block/${modelName}` });
+    await writeJson(path.join(resDir, `assets/${project.modId}/blockstates/${b.id}.json`), { variants: { '': { model: `${project.modId}:block/${modelName}` } } });
   }
 
   for (const recipe of recipes) await writeJson(path.join(resDir, `data/${project.modId}/recipes/${recipe.id}.json`), recipeJson(project, recipe));

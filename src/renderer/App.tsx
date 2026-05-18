@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../shared/types/ai';
 import type { AiChatMessage, AiProjectChangePlan, AiProviderConfig } from '../shared/types/ai';
-import type { Diagnostic, ElementModel, ItemKind, RecipeType, ToolTier } from '../shared/types/elements';
+import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
 import type { ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
@@ -10,9 +10,10 @@ import type { UiScreenModel, UiWidget, UiWidgetType } from '../shared/types/ui';
 
 type ViewId = 'home' | 'design' | 'elements' | 'resources' | 'logic' | 'ui' | 'forge' | 'ai' | 'manage' | 'settings';
 type BottomId = 'logs' | 'diagnostics' | 'ir' | 'code' | 'ai';
-type ElementKind = 'item' | 'block' | 'recipe' | 'loot_table' | 'function';
+type ElementKind = 'item' | 'block' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment';
 type TextureTool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 type TextureSize = 16 | 32 | 64;
+type ModelUsage = 'item_model' | 'block_model';
 
 type ElementSet = {
   items: ElementModel[];
@@ -20,6 +21,9 @@ type ElementSet = {
   recipes: ElementModel[];
   lootTables: ElementModel[];
   functions: ElementModel[];
+  mobEffects: ElementModel[];
+  potions: ElementModel[];
+  enchantments: ElementModel[];
 };
 
 type ResourceContextMenu = {
@@ -103,6 +107,17 @@ type DesignTask = {
   actionLabel: string;
 };
 
+type ContentKit = {
+  id: string;
+  title: string;
+  subtitle: string;
+  elementKind: ElementKind;
+  elementId: string;
+  elementName: string;
+  view: ViewId;
+  tone: 'grass' | 'stone' | 'ore' | 'redstone';
+};
+
 type AiDraftNode = {
   id?: string;
   nodeId?: string;
@@ -143,16 +158,28 @@ type TextureEditorDraft = {
   updatedAt?: string;
 };
 
+type ModelEditorDraft = {
+  modelName: string;
+  modelUsage: ModelUsage;
+  modelOwner: string;
+  modelJson: string;
+  updatedAt?: string;
+};
+
 const api = window.blockforge;
 const textureEditorMode = new URLSearchParams(window.location.search).get('textureEditor') === '1';
+const modelEditorMode = new URLSearchParams(window.location.search).get('modelEditor') === '1';
 const initialProjectDir = new URLSearchParams(window.location.search).get('projectDir') || 'E:\\MCMOD\\projects\\ice_wand_demo';
-const emptyElements: ElementSet = { items: [], blocks: [], recipes: [], lootTables: [], functions: [] };
+const emptyElements: ElementSet = { items: [], blocks: [], recipes: [], lootTables: [], functions: [], mobEffects: [], potions: [], enchantments: [] };
 const kindLabels: Record<ElementKind, string> = {
   item: '物品',
   block: '方块',
   recipe: '配方',
   loot_table: '战利品表',
-  function: 'mcfunction'
+  function: 'mcfunction',
+  mob_effect: '状态效果',
+  potion: '药水',
+  enchantment: '附魔'
 };
 const itemKindLabels: Record<ItemKind, string> = {
   generic: '普通物品 / 材料',
@@ -165,6 +192,32 @@ const itemKindLabels: Record<ItemKind, string> = {
   tool_hoe: '工具：锄',
   food: '食物'
 };
+const mobEffectCategoryLabels: Record<MobEffectCategory, string> = {
+  beneficial: '增益',
+  harmful: '减益',
+  neutral: '中性'
+};
+const potionKindLabels: Record<PotionKind, string> = {
+  drinkable: '可饮用',
+  splash: '喷溅',
+  lingering: '滞留',
+  tipped_arrow: '药箭'
+};
+const enchantmentRarityLabels: Record<EnchantmentRarity, string> = {
+  common: '普通',
+  uncommon: '罕见',
+  rare: '稀有',
+  very_rare: '极稀有'
+};
+const enchantmentSlotLabels: Record<EnchantmentSlot, string> = {
+  mainhand: '主手',
+  offhand: '副手',
+  head: '头盔',
+  chest: '胸甲',
+  legs: '护腿',
+  feet: '靴子',
+  any: '任意'
+};
 const recipeTypeLabels: Record<RecipeType, string> = {
   shapeless: '无序合成',
   shaped: '有序合成',
@@ -176,16 +229,16 @@ const variableTypeLabels: Record<LogicVariableType, string> = {
   boolean: '布尔'
 };
 const viewLabels: Record<ViewId, string> = {
-  home: '项目',
-  design: '设计中心',
-  elements: '元素',
-  resources: '资源',
-  logic: '节点逻辑',
-  ui: '界面设计',
-  forge: 'Forge 生成',
-  ai: '智能助手',
-  manage: '项目管理',
-  settings: '设置'
+  home: '工作台',
+  design: '蓝图',
+  elements: '方块/物品',
+  resources: '材质资源',
+  logic: '红石逻辑',
+  ui: 'GUI 容器',
+  forge: '锻造导出',
+  ai: 'AI 助手',
+  manage: '存档管理',
+  settings: '设置/教程'
 };
 const bottomLabels: Record<BottomId, string> = {
   logs: '日志',
@@ -410,7 +463,15 @@ function ownerTextureName(ownerElement: string) {
   return id.replace(/[^a-z0-9_]/g, '_').toLowerCase();
 }
 
+function ownerModelName(ownerElement: string) {
+  return `${ownerTextureName(ownerElement)}_model`;
+}
+
 function isTextureNameValid(value: string) {
+  return /^[a-z0-9_]+$/.test(value);
+}
+
+function isModelNameValid(value: string) {
   return /^[a-z0-9_]+$/.test(value);
 }
 
@@ -443,7 +504,7 @@ function createUiWidget(type: UiWidgetType, index: number): UiWidget {
 }
 
 function providerNeedsApiKey(config: AiProviderConfig) {
-  return config.provider !== 'ollama' && config.provider !== 'lmstudio' && config.provider !== 'mimo';
+  return config.provider !== 'ollama' && config.provider !== 'lmstudio';
 }
 
 function withApiKey(preset: Omit<AiProviderConfig, 'apiKey'>, apiKey = ''): AiProviderConfig {
@@ -451,7 +512,7 @@ function withApiKey(preset: Omit<AiProviderConfig, 'apiKey'>, apiKey = ''): AiPr
 }
 
 export default function App() {
-  const [activeView, setActiveView] = useState<ViewId>(textureEditorMode ? 'resources' : 'home');
+  const [activeView, setActiveView] = useState<ViewId>(textureEditorMode || modelEditorMode ? 'resources' : 'home');
   const [bottomTab, setBottomTab] = useState<BottomId>('logs');
   const [projectDir, setProjectDir] = useState(initialProjectDir);
   const [openDir, setOpenDir] = useState('');
@@ -501,6 +562,12 @@ export default function App() {
   const [texturePixels, setTexturePixels] = useState(() => createTexturePixels(16));
   const [textureDrawing, setTextureDrawing] = useState(false);
   const [textureDraftLoaded, setTextureDraftLoaded] = useState(false);
+  const [modelPath, setModelPath] = useState('');
+  const [modelUsage, setModelUsage] = useState<ModelUsage>('item_model');
+  const [modelOwner, setModelOwner] = useState('item:ice_wand');
+  const [modelName, setModelName] = useState('ice_wand_model');
+  const [modelJson, setModelJson] = useState('');
+  const [modelDraftLoaded, setModelDraftLoaded] = useState(false);
   const [resourceMenu, setResourceMenu] = useState<ResourceContextMenu>(null);
   const [templatePath, setTemplatePath] = useState('');
 
@@ -542,7 +609,10 @@ export default function App() {
     ...elements.blocks,
     ...elements.recipes,
     ...elements.lootTables,
-    ...elements.functions
+    ...elements.functions,
+    ...elements.mobEffects,
+    ...elements.potions,
+    ...elements.enchantments
   ], [elements]);
   const filteredElements = useMemo(() => {
     const keyword = elementFilter.trim().toLowerCase();
@@ -563,10 +633,52 @@ export default function App() {
     completed: appSettings.completedProjects.some(item => item.projectDir === projectDir)
   }), [allElements.length, appSettings.completedProjects, graphs.length, projectDir, resources.resources.length, uiScreens.length]);
   const missingTextureElements = useMemo(() => allElements.filter(element => {
-    if (element.type === 'item') return !(element.properties as { texture?: string }).texture;
-    if (element.type === 'block') return !(element.properties as { textureAll?: string }).textureAll;
+    if (element.type === 'item') return !(element.properties as { texture?: string; model?: string }).texture && !(element.properties as { model?: string }).model;
+    if (element.type === 'block') return !(element.properties as { textureAll?: string; model?: string }).textureAll && !(element.properties as { model?: string }).model;
     return false;
   }), [allElements]);
+  const contentKits = useMemo<ContentKit[]>(() => [
+    {
+      id: 'ore_line',
+      title: '矿脉材料线',
+      subtitle: '先做发光矿石，再补材料、掉落和熔炼配方。',
+      elementKind: 'block',
+      elementId: 'glow_ore',
+      elementName: '发光矿石',
+      view: 'elements',
+      tone: 'stone'
+    },
+    {
+      id: 'spell_line',
+      title: '法杖药水线',
+      subtitle: '适合右键施法、状态效果、药水和粒子命令。',
+      elementKind: 'item',
+      elementId: 'arcane_staff',
+      elementName: '奥术法杖',
+      view: 'elements',
+      tone: 'ore'
+    },
+    {
+      id: 'machine_line',
+      title: '机器方块线',
+      subtitle: '适合 GUI、物品槽、红石节点和方块交互。',
+      elementKind: 'block',
+      elementId: 'copper_workbench',
+      elementName: '铜制工作台',
+      view: 'elements',
+      tone: 'redstone'
+    },
+    {
+      id: 'survival_line',
+      title: '生存扩展线',
+      subtitle: '从食物、附魔、战利品表开始做可游玩的内容。',
+      elementKind: 'item',
+      elementId: 'cave_berry',
+      elementName: '洞穴浆果',
+      view: 'elements',
+      tone: 'grass'
+    }
+  ], []);
   const designTasks = useMemo<DesignTask[]>(() => [
     {
       id: 'project',
@@ -651,8 +763,8 @@ export default function App() {
         title: '资源与贴图',
         status: projectStats.resources > 0 ? 'active' : projectStats.elements > 0 ? 'todo' : 'blocked',
         progress: Math.min(100, projectStats.resources * 25),
-        summary: `已登记 ${projectStats.resources} 个贴图资源，支持导入、绘制、复制、删除和绑定。`,
-        nextAction: projectStats.resources > 0 ? '检查缺失贴图并补齐' : '导入 PNG 或使用内置像素绘制器',
+        summary: `已登记 ${projectStats.resources} 个贴图与模型资源，支持导入、绘制、复制、删除和绑定。`,
+        nextAction: projectStats.resources > 0 ? '检查缺失资源并补齐' : '导入 PNG 或 3D 模型资源',
         view: 'resources'
       },
       {
@@ -762,7 +874,7 @@ export default function App() {
     setModId(result.project.modId);
     setPackageName(result.project.packageName);
     setDisplayName(result.project.displayName);
-    setActiveView(textureEditorMode ? 'resources' : 'elements');
+    setActiveView(textureEditorMode || modelEditorMode ? 'resources' : 'elements');
     pushLog(`已打开项目：${result.project.displayName}，目录：${result.projectDir}。`);
     await refreshProjectData(result.projectDir);
     await loadTextureDraft(result.projectDir);
@@ -782,7 +894,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!textureEditorMode || !api || autoOpenedTextureProject.current || project) return;
+    if ((!textureEditorMode && !modelEditorMode) || !api || autoOpenedTextureProject.current || project) return;
     autoOpenedTextureProject.current = true;
     void openProject(projectDir);
   }, [api, project, projectDir]);
@@ -880,7 +992,10 @@ export default function App() {
         block: api.elements.createBlock,
         recipe: api.elements.createRecipe,
         loot_table: api.elements.createLootTable,
-        function: api.elements.createFunction
+        function: api.elements.createFunction,
+        mob_effect: api.elements.createMobEffect,
+        potion: api.elements.createPotion,
+        enchantment: api.elements.createEnchantment
       }[elementKind];
       const element = await creator(payload);
       setDraftElement(element);
@@ -891,6 +1006,14 @@ export default function App() {
         pushLog(`已保存${kindLabels[elementKind]}：${element.id}。`);
       }
     });
+  }
+
+  function applyContentKit(kit: ContentKit) {
+    setElementKind(kit.elementKind);
+    setElementId(kit.elementId);
+    setElementName(kit.elementName);
+    setActiveView(kit.view);
+    pushLog(`已载入玩法蓝图：${kit.title}。请在元素页确认属性后保存。`);
   }
 
   async function saveDraftElement() {
@@ -926,7 +1049,7 @@ export default function App() {
 
   async function deleteDraftElement() {
     if (!draftElement) return;
-    const ok = window.confirm(`确定删除元素 ${draftElement.displayName.zh_cn} (${draftElement.type}:${draftElement.id}) 吗？\n贴图资源不会自动删除，可在资源页右键清理。`);
+    const ok = window.confirm(`确定删除元素 ${draftElement.displayName.zh_cn} (${draftElement.type}:${draftElement.id}) 吗？\n资源文件不会自动删除，可在资源页右键清理。`);
     if (!ok) return;
     await runAction('删除元素', async () => {
       if (!api || !draftElement) return;
@@ -955,14 +1078,27 @@ export default function App() {
         if ((element.type === 'item' || element.type === 'block') && element.enabled) {
           const props = element.properties as Record<string, unknown>;
           const textureName = String(element.type === 'item' ? props.texture || '' : props.textureAll || '');
-          if (!textureName) {
+          const modelName = String(props.model || '');
+          if (!textureName && !modelName) {
             nextDiagnostics.push({
               level: 'warning',
               code: 'ELEMENT_TEXTURE_EMPTY',
               target: `${element.type}:${element.id}`,
-              message: `元素“${element.displayName.zh_cn}”还没有绑定贴图。`,
-              humanAdvice: '打开资源页导入或绘制贴图，保存后会自动写入贴图文件名。'
+              message: `元素“${element.displayName.zh_cn}”还没有绑定贴图或 3D 模型。`,
+              humanAdvice: '打开资源页导入或绘制贴图，或者绑定一个 item/block 模型资源。'
             });
+          }
+          if (modelName) {
+            const modelResource = resources.resources.find(resource => resource.type === 'model' && basenameNoExt(resource.path) === modelName);
+            if (!modelResource) {
+              nextDiagnostics.push({
+                level: 'warning',
+                code: 'ELEMENT_MODEL_EMPTY',
+                target: `${element.type}:${element.id}`,
+                message: `元素“${element.displayName.zh_cn}”引用了模型 ${modelName}，但资源索引中没有找到。`,
+                humanAdvice: '请在资源页创建或导入同名模型文件，或者把模型资源名改成存在的文件名。'
+              });
+            }
           }
         }
       }
@@ -1005,6 +1141,25 @@ export default function App() {
     const next = {
       ...element,
       properties: { ...(element.properties as Record<string, unknown>), [propName]: name }
+    };
+    const saved = await api.elements.save({ projectDir, element: next });
+    setElements(saved);
+    if (draftElement?.type === next.type && draftElement.id === next.id) {
+      setDraftElement(next);
+      setElementJson(pretty(next));
+    }
+  }
+
+  async function bindModelToElement(name: string) {
+    if (!api || !project) return;
+    const [ownerType, ownerId] = modelOwner.split(':');
+    if (!ownerId || (ownerType !== 'item' && ownerType !== 'block')) return;
+    const pool = ownerType === 'item' ? elements.items : elements.blocks;
+    const element = pool.find(item => item.id === ownerId);
+    if (!element) return;
+    const next = {
+      ...element,
+      properties: { ...(element.properties as Record<string, unknown>), model: name }
     };
     const saved = await api.elements.save({ projectDir, element: next });
     setElements(saved);
@@ -1137,11 +1292,116 @@ export default function App() {
     });
   }
 
+  function modelDraft() {
+    return {
+      modelName,
+      modelUsage,
+      modelOwner,
+      modelJson
+    };
+  }
+
+  function defaultModelJson() {
+    const ownerId = ownerTextureName(modelOwner);
+    if (modelUsage === 'block_model') {
+      return JSON.stringify({
+        parent: 'minecraft:block/cube_all',
+        textures: {
+          all: `${project?.modId || 'minecraft'}:block/${ownerId}`
+        }
+      }, null, 2);
+    }
+    return JSON.stringify({
+      parent: 'minecraft:item/generated',
+      textures: {
+        layer0: `${project?.modId || 'minecraft'}:item/${ownerId}`
+      }
+    }, null, 2);
+  }
+
+  function applyModelBindingFields(resource: ResourceItem) {
+    const usage = resource.usage === 'block_model' ? 'block_model' : 'item_model';
+    setModelUsage(usage);
+    if (resource.ownerElement) setModelOwner(resource.ownerElement);
+    setModelName(basenameNoExt(resource.path));
+    setModelJson('');
+    setModelDraftLoaded(true);
+  }
+
+  async function loadModelResource(resource: ResourceItem) {
+    if (!api || !project || resource.type !== 'model') return;
+    const content = await api.resources.readContent({ projectDir, resourceId: resource.resourceId });
+    const usage = resource.usage === 'block_model' ? 'block_model' : 'item_model';
+    setModelUsage(usage);
+    setModelOwner(resource.ownerElement || (usage === 'block_model' ? 'block:stone' : 'item:stick'));
+    setModelName(basenameNoExt(resource.path));
+    setModelJson(content);
+    setModelDraftLoaded(true);
+  }
+
+  async function importModel() {
+    await runAction('导入模型', async () => {
+      if (!api || !project) return;
+      if (!isModelNameValid(modelName)) {
+        throw new Error('模型名只能使用小写英文字母、数字和下划线。');
+      }
+      const resource = await api.resources.importModel({
+        projectDir,
+        sourceFile: modelPath || undefined,
+        usage: modelUsage,
+        ownerElement: modelOwner,
+        modelName
+      });
+      setResources(await api.resources.readIndex({ projectDir }));
+      if (resource) {
+        await bindModelToElement(modelName);
+        pushLog(`已导入 3D 模型 ${modelName}.json 并绑定到 ${modelOwner}。`);
+      } else {
+        pushLog('模型导入已取消。');
+      }
+    });
+  }
+
+  async function saveModelDraft() {
+    await runAction('保存模型', async () => {
+      if (!api || !project) return;
+      if (!isModelNameValid(modelName)) {
+        throw new Error('模型名只能使用小写英文字母、数字和下划线。');
+      }
+      const payloadJson = modelJson.trim() || defaultModelJson();
+      await api.resources.saveModel({
+        projectDir,
+        jsonText: payloadJson,
+        usage: modelUsage,
+        ownerElement: modelOwner,
+        modelName
+      });
+      await bindModelToElement(modelName);
+      setResources(await api.resources.readIndex({ projectDir }));
+      setModelJson(payloadJson);
+      setModelDraftLoaded(true);
+      pushLog(`已保存 3D 模型 ${modelName}.json，并自动绑定到 ${modelOwner}。`);
+    });
+  }
+
+  async function resetModelDraft() {
+    setModelJson(defaultModelJson());
+    setModelDraftLoaded(true);
+  }
+
+  async function openModelEditorWindow() {
+    await runAction('打开独立模型窗口', async () => {
+      if (!api || !project) return;
+      await api.modelEditor.openWindow({ projectDir });
+      pushLog('已打开独立 3D 模型编辑窗口。');
+    });
+  }
+
   async function duplicateResource(resource: ResourceItem) {
     await runAction('复制资源', async () => {
       if (!api || !project) return;
       const suggested = `${basenameNoExt(resource.path)}_copy`;
-      const newName = window.prompt('输入复制后的贴图名（小写字母、数字、下划线）', suggested);
+      const newName = window.prompt(resource.type === 'model' ? '输入复制后的模型名（小写字母、数字、下划线）' : '输入复制后的贴图名（小写字母、数字、下划线）', suggested);
       if (!newName) return;
       const copied = await api.resources.duplicate({ projectDir, resourceId: resource.resourceId, newName });
       setResources(await api.resources.readIndex({ projectDir }));
@@ -1172,12 +1432,21 @@ export default function App() {
     await runAction('绑定资源', async () => {
       if (!api || !project) return;
       const name = basenameNoExt(resource.path);
-      const usage = resource.usage === 'block_texture' ? 'block_texture' : 'item_texture';
-      setTextureUsage(usage);
-      setTextureName(name);
-      await bindTextureToElement(name);
+      if (resource.type === 'model') {
+        const usage = resource.usage === 'block_model' ? 'block_model' : 'item_model';
+        setModelUsage(usage);
+        setModelName(name);
+        if (resource.ownerElement) setModelOwner(resource.ownerElement);
+        await bindModelToElement(name);
+      } else {
+        const usage = resource.usage === 'block_texture' ? 'block_texture' : 'item_texture';
+        setTextureUsage(usage);
+        setTextureName(name);
+        if (resource.ownerElement) setTextureOwner(resource.ownerElement);
+        await bindTextureToElement(name);
+      }
       setResources(await api.resources.readIndex({ projectDir }));
-      pushLog(`已把 ${name}.png 绑定到 ${textureOwner}。`);
+      pushLog(`已把 ${name}.${resource.type === 'model' ? 'json' : 'png'} 绑定到 ${resource.ownerElement || '当前元素'}。`);
     });
   }
 
@@ -2054,34 +2323,47 @@ export default function App() {
   const selectedSourceNode = currentGraph?.nodes.find(node => node.nodeId === edgeSource);
   const pickElement = (element: ElementModel) => {
     setDraftElement(element);
-    setTextureOwner(`${element.type}:${element.id}`);
-    if (element.type === 'item') setTextureUsage('item_texture');
-    if (element.type === 'block') setTextureUsage('block_texture');
+    if (element.type === 'item' || element.type === 'block') {
+      setTextureOwner(`${element.type}:${element.id}`);
+      setTextureUsage(element.type === 'block' ? 'block_texture' : 'item_texture');
+      setModelOwner(`${element.type}:${element.id}`);
+      setModelUsage(element.type === 'block' ? 'block_model' : 'item_model');
+      setModelName(String((element.properties as { model?: string }).model || ownerModelName(`${element.type}:${element.id}`)));
+    }
     setActiveView('elements');
   };
 
   return (
-    <div className={`app-shell density-${appSettings.uiDensity} ${appSettings.panelVisibility.leftSidebar ? '' : 'no-left-sidebar'} ${appSettings.panelVisibility.rightSidebar ? '' : 'no-right-sidebar'} ${appSettings.panelVisibility.bottomPanel ? '' : 'no-bottom-panel'} ${textureEditorMode ? 'texture-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
+    <div className={`app-shell density-${appSettings.uiDensity} ${appSettings.panelVisibility.leftSidebar ? '' : 'no-left-sidebar'} ${appSettings.panelVisibility.rightSidebar ? '' : 'no-right-sidebar'} ${appSettings.panelVisibility.bottomPanel ? '' : 'no-bottom-panel'} ${textureEditorMode ? 'texture-editor-mode' : ''} ${modelEditorMode ? 'model-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
       <header className="topbar">
         <div className="brand">
-          <strong>BlockForge Studio</strong>
+          <div className="brand-mark">
+            <span className="minecraft-cube grass" />
+            <div>
+              <strong>BlockForge Studio</strong>
+              <small>像搭方块一样制作 Forge 模组</small>
+            </div>
+          </div>
           <span>{project ? `${project.displayName} / ${project.modId}` : '未打开项目'} · {canUseBridge ? '桌面桥接已就绪' : '桥接不可用'} · {statusMessage}</span>
         </div>
         <div className="top-actions">
           {busy && <span className="busy-pill">处理中：{busy}</span>}
-          <button onClick={() => generateForge()} disabled={!project || Boolean(busy)}>生成 Forge 工程</button>
-          <button onClick={buildJar} disabled={!project || Boolean(busy)}>构建模组 jar</button>
+          <button onClick={() => generateForge()} disabled={!project || Boolean(busy)}>锻造 Forge 工程</button>
+          <button onClick={buildJar} disabled={!project || Boolean(busy)}>打包模组 jar</button>
         </div>
       </header>
 
-      <main className={`workspace ${textureEditorMode ? 'texture-editor-workspace' : ''}`}>
-        {!textureEditorMode && (
+      <main className={`workspace ${textureEditorMode || modelEditorMode ? 'asset-editor-workspace' : ''}`}>
+        {!textureEditorMode && !modelEditorMode && (
         <aside className="sidebar">
-          <div className="panel-title">项目资源</div>
-          <button className={activeView === 'home' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('home')}>启动页</button>
-          <button className={activeView === 'design' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('design')}>设计中心</button>
+          <div className="panel-title">方块工作区</div>
+          <button className={activeView === 'home' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('home')}>工作台总览</button>
+          <button className={activeView === 'design' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('design')}>玩法蓝图</button>
           <TreeGroup title={`物品 (${elements.items.length})`} items={elements.items} onPick={pickElement} />
           <TreeGroup title={`方块 (${elements.blocks.length})`} items={elements.blocks} onPick={pickElement} />
+          <TreeGroup title={`状态效果 (${elements.mobEffects.length})`} items={elements.mobEffects} onPick={pickElement} />
+          <TreeGroup title={`药水 (${elements.potions.length})`} items={elements.potions} onPick={pickElement} />
+          <TreeGroup title={`附魔 (${elements.enchantments.length})`} items={elements.enchantments} onPick={pickElement} />
           <TreeGroup title={`配方 (${elements.recipes.length})`} items={elements.recipes} onPick={pickElement} />
           <TreeGroup title={`战利品表 (${elements.lootTables.length})`} items={elements.lootTables} onPick={pickElement} />
           <TreeGroup title={`函数 (${elements.functions.length})`} items={elements.functions} onPick={pickElement} />
@@ -2133,14 +2415,14 @@ export default function App() {
 
           {activeView === 'design' && (
             <section className="view-grid two design-center">
-              <Panel title="软件功能设计总览">
+              <Panel title="模组蓝图总览">
                 <div className="design-hero">
                   <div>
-                    <span>BlockForge Studio 首版闭环</span>
+                    <span>从一块矿石到一个可玩的模组</span>
                     <strong>{designScore}%</strong>
                   </div>
                   <ProgressBar value={designScore} />
-                  <p>从项目、元素、贴图、节点逻辑、GUI、Forge 生成到 AI 辅助，所有能力都围绕“可视化制作 Minecraft Forge 模组”串起来。这里会根据当前项目状态给出下一步。</p>
+                  <p>把项目当作一个世界存档来搭建：先放方块和物品，再铺材质、红石逻辑、GUI 容器，最后锻造成 Forge 工程。这里会按当前进度提示下一步。</p>
                 </div>
                 <div className="design-flow">
                   {designModules.map((module, index) => (
@@ -2152,7 +2434,7 @@ export default function App() {
                   ))}
                 </div>
               </Panel>
-              <Panel title="当前项目下一步">
+              <Panel title="下一块该放哪里">
                 {!project && <div className="tree-empty">还没有打开项目。先创建示例项目，最快能验证完整流程。</div>}
                 {project && (
                   <>
@@ -2172,13 +2454,13 @@ export default function App() {
                     <div className="button-row wrap">
                       <button onClick={runProjectHealthCheck} disabled={Boolean(busy)}>项目健康检查</button>
                       <button onClick={saveCurrentWork} disabled={Boolean(busy)}>保存当前工作</button>
-                      <button onClick={() => generateForge(true)} disabled={Boolean(busy)}>生成并构建</button>
-                      <button onClick={() => setActiveView('ai')}>让 AI 给改进建议</button>
+                      <button onClick={() => generateForge(true)} disabled={Boolean(busy)}>锻造并打包</button>
+                      <button onClick={() => setActiveView('ai')}>让 AI 巡检蓝图</button>
                     </div>
                   </>
                 )}
               </Panel>
-              <Panel title="项目制作清单">
+              <Panel title="生存模式制作清单">
                 <div className="checklist-head">
                   <div>
                     <strong>{taskScore}%</strong>
@@ -2199,18 +2481,33 @@ export default function App() {
                   ))}
                 </div>
               </Panel>
-              <Panel title="快速创建建议">
+              <Panel title="玩法蓝图包">
+                <div className="kit-grid">
+                  {contentKits.map(kit => (
+                    <button className={`kit-card ${kit.tone}`} key={kit.id} onClick={() => applyContentKit(kit)}>
+                      <span className={`minecraft-cube ${kit.tone}`} />
+                      <strong>{kit.title}</strong>
+                      <small>{kit.subtitle}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="hint">蓝图包会先把元素类型、ID 和中文名填好，你可以继续编辑属性、贴图、模型、掉落和节点逻辑。</div>
+              </Panel>
+              <Panel title="快速创建">
                 <div className="quick-suggestion-grid">
                   <button onClick={() => { setElementKind('item'); setElementId('new_material'); setElementName('新材料'); setActiveView('elements'); }}>材料物品</button>
                   <button onClick={() => { setElementKind('item'); setElementId('magic_wand'); setElementName('魔法法杖'); setActiveView('elements'); }}>法杖物品</button>
                   <button onClick={() => { setElementKind('block'); setElementId('machine_block'); setElementName('机器方块'); setActiveView('elements'); }}>机器方块</button>
+                  <button onClick={() => { setElementKind('mob_effect'); setElementId('frostbite'); setElementName('霜寒状态'); setActiveView('elements'); }}>状态效果</button>
+                  <button onClick={() => { setElementKind('potion'); setElementId('frost_potion'); setElementName('霜寒药水'); setActiveView('elements'); }}>药水</button>
+                  <button onClick={() => { setElementKind('enchantment'); setElementId('frost_affinity'); setElementName('霜寒亲和'); setActiveView('elements'); }}>附魔</button>
                   <button onClick={() => { setElementKind('recipe'); setElementId('core_recipe'); setElementName('核心配方'); setActiveView('elements'); }}>合成配方</button>
                   <button onClick={() => { setElementKind('loot_table'); setElementId('block_loot'); setElementName('方块掉落'); setActiveView('elements'); }}>掉落表</button>
                   <button onClick={() => { setElementKind('function'); setElementId('cast_spell'); setElementName('施法函数'); setActiveView('elements'); }}>mcfunction</button>
                 </div>
-                <div className="hint">这些按钮会帮你预填元素类型、ID 和中文名，再到“元素”页继续编辑具体属性。</div>
+                <div className="hint">这些按钮会帮你预填元素类型、ID 和中文名，再到“方块/物品”页继续细化具体属性。</div>
               </Panel>
-              <Panel title="模块能力边界">
+              <Panel title="功能模块矿脉">
                 <div className="module-grid">
                   {designModules.map(module => (
                     <div className={`module-card ${module.status}`} key={module.id}>
@@ -2225,13 +2522,13 @@ export default function App() {
                   ))}
                 </div>
               </Panel>
-              <Panel title="首版功能原则">
+              <Panel title="工作台原则">
                 <div className="principle-list">
-                  <div><strong>桌面软件优先</strong><span>保持 VS Code + MCreator 风格，不做浏览器 landing page。</span></div>
-                  <div><strong>安全可回退</strong><span>构建、AI 大改、快照和日志都保留痕迹，避免误改项目。</span></div>
-                  <div><strong>数据先可编辑</strong><span>表单负责常用属性，高级 JSON 负责兜底，生成代码来自模型数据。</span></div>
-                  <div><strong>国内网络友好</strong><span>Forge 构建默认偏向国内镜像，失败时把日志保存并给出可读原因。</span></div>
-                  <div><strong>P4 保留入口</strong><span>Fabric、多版本加载器、高级 GUI 运行时等先保留结构，不伪装成完整实现。</span></div>
+                  <div><strong>桌面工作台优先</strong><span>保持 VS Code + MCreator 风格，所有工具围绕当前项目展开。</span></div>
+                  <div><strong>像红石一样可追踪</strong><span>构建、AI 大改、快照和日志都保留痕迹，方便回退和排错。</span></div>
+                  <div><strong>表单是铁镐，JSON 是钻镐</strong><span>常用属性直接填，高级 JSON 兜底，最终都生成可检查的 Forge 文件。</span></div>
+                  <div><strong>国内网络友好</strong><span>Forge 构建默认偏向国内镜像，失败时保存日志并给出可读原因。</span></div>
+                  <div><strong>保留扩展矿道</strong><span>Fabric、多版本加载器、高级 GUI 运行时等先保留结构，不伪装成完整实现。</span></div>
                 </div>
               </Panel>
             </section>
@@ -2239,6 +2536,29 @@ export default function App() {
 
           {activeView === 'home' && (
             <section className="view-grid two">
+              <Panel title="方块工坊总控台">
+                <div className="workbench-hero">
+                  <div className="block-mosaic" aria-hidden="true">
+                    <span className="block grass" />
+                    <span className="block dirt" />
+                    <span className="block stone" />
+                    <span className="block ore" />
+                    <span className="block redstone" />
+                    <span className="block plank" />
+                  </div>
+                  <div>
+                    <strong>{project ? project.displayName : '先放下第一块方块'}</strong>
+                    <span>{project ? `命名空间 ${project.modId} · Forge ${project.minecraftVersion}` : '创建项目后，就能开始制作物品、方块、贴图、红石逻辑和 Forge jar。'}</span>
+                  </div>
+                </div>
+                <div className="button-row wrap">
+                  <button onClick={() => setActiveView('design')}>查看玩法蓝图</button>
+                  <button onClick={() => setActiveView('elements')} disabled={!project}>创建方块/物品</button>
+                  <button onClick={() => setActiveView('resources')} disabled={!project}>制作材质资源</button>
+                  <button onClick={() => generateForge(true)} disabled={!project || Boolean(busy)}>锻造并打包</button>
+                </div>
+                <div className="hint">这里是 BlockForge 的工作台入口：从世界设定到元素、资源、红石节点和导出，都尽量保持可视、可回退、可继续修改。</div>
+              </Panel>
               <Panel title="新建项目">
                 <Field label="项目目录" value={projectDir} onChange={setProjectDir} hint="BlockForge 会在这里保存编辑数据、生成工程、构建日志和导出的 jar。" />
                 <Field label="显示名称" value={displayName} onChange={setDisplayName} />
@@ -2249,7 +2569,7 @@ export default function App() {
                   <button onClick={createProject} disabled={!canUseBridge || Boolean(busy)}>创建项目</button>
                   <button onClick={createSampleProject} disabled={!canUseBridge || Boolean(busy)}>一键示例项目</button>
                 </div>
-                <div className="hint">示例项目会自动创建冰霜法杖、霜冻方块、配方、战利品表、函数、节点图和 Forge 工程。</div>
+                <div className="hint">示例项目会自动创建冰霜法杖、霜冻方块、配方、战利品表、函数、节点图、状态效果、药水、附魔和 Forge 工程。</div>
               </Panel>
               <Panel title="打开项目">
                 <Field label="项目目录" value={openDir} onChange={setOpenDir} placeholder="留空时打开系统目录选择器" hint="可以打开最近项目，也可以粘贴任意 BlockForge 项目目录。" />
@@ -2258,21 +2578,21 @@ export default function App() {
                   {recent.map(item => <button key={item} onClick={() => openProject(item)}>{item}</button>)}
                 </div>
               </Panel>
-              <Panel title="当前项目概览">
-                {!project && <div className="tree-empty">还没有打开项目。创建或打开项目后，这里会显示内容完成度。</div>}
+              <Panel title="当前世界概览">
+                {!project && <div className="tree-empty">还没有打开项目。创建或打开项目后，这里会显示模组内容完成度。</div>}
                 {project && (
                   <>
                     <div className="stat-grid">
                       <div><strong>{projectStats.elements}</strong><span>元素</span></div>
-                      <div><strong>{projectStats.resources}</strong><span>贴图资源</span></div>
+                      <div><strong>{projectStats.resources}</strong><span>资源文件</span></div>
                       <div><strong>{projectStats.graphs}</strong><span>节点图</span></div>
                       <div><strong>{projectStats.screens}</strong><span>界面模型</span></div>
                     </div>
                     <div className="button-row wrap">
-                      <button onClick={() => setActiveView('elements')}>编辑元素</button>
-                      <button onClick={() => setActiveView('resources')}>制作贴图</button>
-                      <button onClick={() => setActiveView('logic')}>编辑节点逻辑</button>
-                      <button onClick={() => setActiveView('forge')}>生成与构建</button>
+                      <button onClick={() => setActiveView('elements')}>编辑方块/物品</button>
+                      <button onClick={() => setActiveView('resources')}>制作材质资源</button>
+                      <button onClick={() => setActiveView('logic')}>编辑红石逻辑</button>
+                      <button onClick={() => setActiveView('forge')}>锻造与构建</button>
                       <button onClick={saveCurrentWork} disabled={Boolean(busy)}>保存当前工作</button>
                       <button onClick={runProjectHealthCheck} disabled={Boolean(busy)}>项目健康检查</button>
                     </div>
@@ -2285,7 +2605,7 @@ export default function App() {
 
           {activeView === 'elements' && (
             <section className="view-grid two">
-              <Panel title="创建元素">
+              <Panel title="放置新方块 / 物品">
                 <label>类型</label>
                 <select value={elementKind} onChange={event => setElementKind(event.target.value as ElementKind)}>
                   {Object.entries(kindLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
@@ -2297,7 +2617,7 @@ export default function App() {
                   <button onClick={() => createElementDraft(true)} disabled={!project || Boolean(busy)}>创建并保存</button>
                 </div>
                 <div className="element-search">
-                  <Field label="搜索元素" value={elementFilter} onChange={setElementFilter} placeholder="输入 ID、中文名、类型或描述" />
+                  <Field label="搜索工坊元素" value={elementFilter} onChange={setElementFilter} placeholder="输入 ID、中文名、类型或描述" />
                   <div className="element-search-list">
                     {filteredElements.length === 0 && <div className="tree-empty">没有匹配的元素。</div>}
                     {filteredElements.map(element => (
@@ -2309,8 +2629,8 @@ export default function App() {
                   </div>
                 </div>
               </Panel>
-              <Panel title="元素属性">
-                {!draftElement && <div className="tree-empty">先在左侧创建或选择一个元素。</div>}
+              <Panel title="属性锻造台">
+                {!draftElement && <div className="tree-empty">先在左侧创建或选择一个元素，再像调工作台配方一样细化属性。</div>}
                 {draftElement && <ElementQuickEditor element={draftElement} onChange={(next) => { setDraftElement(next); setElementJson(pretty(next)); }} />}
                 <details className="advanced-block">
                   <summary>高级：查看或直接编辑元素 JSON</summary>
@@ -2350,7 +2670,7 @@ export default function App() {
                   <span>绑定元素必须写成 item:id 或 block:id；导入或绘制保存后会自动写入元素的 texture / textureAll 属性。</span>
                 </div>
                 <div className="resource-list">
-                  {resources.resources.length === 0 && <div className="tree-empty">还没有资源。导入或绘制贴图后会出现在这里。</div>}
+                  {resources.resources.length === 0 && <div className="tree-empty">还没有资源。导入贴图或模型后会出现在这里。</div>}
                   {resources.resources.map(resource => (
                     <button
                       key={resource.resourceId}
@@ -2360,14 +2680,23 @@ export default function App() {
                         setResourceMenu({ resource, x: event.clientX, y: event.clientY });
                       }}
                       onClick={() => {
-                        if (resource.ownerElement) setTextureOwner(resource.ownerElement);
-                        setTextureUsage(resource.usage === 'block_texture' ? 'block_texture' : 'item_texture');
-                        setTextureName(basenameNoExt(resource.path));
+                        if (resource.type === 'model') {
+                          void loadModelResource(resource);
+                          if (resource.ownerElement) {
+                            setModelOwner(resource.ownerElement);
+                            setModelUsage(resource.usage === 'block_model' ? 'block_model' : 'item_model');
+                          }
+                          setModelName(basenameNoExt(resource.path));
+                        } else {
+                          if (resource.ownerElement) setTextureOwner(resource.ownerElement);
+                          setTextureUsage(resource.usage === 'block_texture' ? 'block_texture' : 'item_texture');
+                          setTextureName(basenameNoExt(resource.path));
+                        }
                       }}
                     >
                       <strong>{basenameNoExt(resource.path)}</strong>
                       <span>{resource.path}</span>
-                      <small>{resource.ownerElement || '未绑定'} · 右键复制/删除/绑定</small>
+                      <small>{resource.type === 'model' ? '3D 模型' : '贴图'} · {resource.ownerElement || '未绑定'} · 右键复制/删除/绑定</small>
                     </button>
                   ))}
                 </div>
@@ -2411,6 +2740,33 @@ export default function App() {
                   <button onClick={() => resetTextureCanvas()} disabled={Boolean(busy)}>清空画布</button>
                 </div>
                 <div className="hint">绘制器保存的是透明背景 PNG；如果要用外部参考图，点击左侧“选择 PNG 并自动绑定”。</div>
+              </Panel>
+              <Panel title="3D 模型编辑器">
+                <Field label="模型文件路径" value={modelPath} onChange={setModelPath} placeholder="留空时打开文件选择器" hint="支持导入 Blockbench 导出的 JSON 模型，也可以直接编辑当前模型内容。" />
+                <label>用途</label>
+                <select value={modelUsage} onChange={event => setModelUsage(event.target.value as ModelUsage)}>
+                  <option value="item_model">物品模型</option>
+                  <option value="block_model">方块模型</option>
+                </select>
+                <Field label="绑定元素" value={modelOwner} onChange={value => {
+                  setModelOwner(value);
+                  setModelUsage(value.startsWith('block:') ? 'block_model' : 'item_model');
+                  setModelName(ownerModelName(value));
+                }} hint="格式为 item:物品id 或 block:方块id，例如 item:ice_wand。" />
+                <Field label="模型文件名" value={modelName} onChange={value => setModelName(value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="不用写 .json，生成时会放到 models/item 或 models/block。" />
+                <div className="button-row">
+                  <button onClick={importModel} disabled={!project || Boolean(busy)}>导入 JSON 并绑定</button>
+                  <button onClick={saveModelDraft} disabled={!project || Boolean(busy)}>保存模型</button>
+                  <button onClick={resetModelDraft} disabled={!project || Boolean(busy)}>填充模板</button>
+                  <button onClick={openModelEditorWindow} disabled={!project || Boolean(busy)}>弹出独立窗口</button>
+                </div>
+                <label>模型 JSON</label>
+                <textarea className="json-editor model-editor" value={modelJson} onChange={event => setModelJson(event.target.value)} placeholder={defaultModelJson()} />
+                <div className="hint">物品模型会生成到 assets/&lt;modid&gt;/models/item/，方块模型会生成到 assets/&lt;modid&gt;/models/block/。绑定模型后，元素属性里的 model 会指向这个文件名。</div>
+                <details className="advanced-block">
+                  <summary>模型预览</summary>
+                  <pre className="data-preview compact">{modelJson ? modelJson : defaultModelJson()}</pre>
+                </details>
               </Panel>
             </section>
           )}
@@ -2835,70 +3191,70 @@ export default function App() {
 
           {activeView === 'settings' && (
             <section className="view-grid settings-grid">
-              <Panel title="软件介绍">
+              <Panel title="工作台说明">
                 <div className="list-panel">
                   <div className="list-row">
                     <div>
-                      <strong>BlockForge Studio 是一个类似 VS Code 的 Minecraft Forge 模组编辑器。</strong>
-                      <span>它把项目、元素、贴图、节点逻辑、NBT、界面草图、Forge 生成、构建日志和 AI 辅助集中在一个桌面工作台里。</span>
+                      <strong>BlockForge Studio 是一个像 VS Code 一样组织项目、像 MCreator 一样制作模组的桌面工作台。</strong>
+                      <span>你可以把它理解成一张强化工作台：左侧是世界资源树，中间是编辑区域，右侧是属性和检查结果，底部保留日志和 Forge 输出。</span>
                     </div>
                   </div>
                   <div className="list-row">
                     <div>
-                      <strong>适合的制作流程</strong>
-                      <span>先做物品/方块，再绑定贴图，然后用节点把事件、条件、变量、NBT 和动作串起来，最后生成 Forge 工程并构建 jar。</span>
+                      <strong>推荐的生存模式流程</strong>
+                      <span>先做物品和方块，再绑定材质或 3D 模型；接着用红石逻辑节点连接事件、条件、变量、NBT 和动作；最后锻造 Forge 工程并构建 jar。</span>
                     </div>
                   </div>
                   <div className="list-row">
                     <div>
                       <strong>当前重点能力</strong>
-                      <span>Forge 1.20.1、中文化属性编辑、内置像素绘制器、右键资源管理、节点变量引用、AI 草案校验和构建前快照。</span>
+                      <span>Forge 1.20.1、中文属性面板、状态效果/药水/附魔、内置像素绘制器、Blockbench JSON 模型、右键资源管理、变量/NBT 节点、AI 草案校验和构建前快照。</span>
                     </div>
                   </div>
                 </div>
-                <div className="hint">推荐顺序：项目 → 元素 → 资源 → 节点逻辑 → Forge 生成 → 构建/导出。任何生成和 AI 大改动前都会尽量保留快照，方便回退。</div>
+                <div className="hint">推荐顺序：工作台 → 方块/物品 → 材质资源 → 红石逻辑 → 锻造导出 → 构建/导出。任何生成和 AI 大改动前都会尽量保留快照，方便回退。</div>
               </Panel>
-              <Panel title="使用教程">
+              <Panel title="新手教程">
                 <div className="tutorial-list">
                   <TutorialStep
                     number="1"
-                    title="创建或打开项目"
-                    text="在“项目”页设置项目目录、模组 ID 和 Java 包名。模组 ID 是 Minecraft 资源命名空间，建议使用小写英文和下划线。"
-                    actionLabel="打开项目页"
+                    title="创建世界存档"
+                    text="在“工作台”页设置项目目录、模组 ID 和 Java 包名。模组 ID 就是 Minecraft 资源命名空间，建议使用小写英文和下划线。"
+                    actionLabel="打开工作台"
                     onAction={() => setActiveView('home')}
                   />
                   <TutorialStep
                     number="2"
-                    title="创建元素"
-                    text="在“元素”页新建物品、方块、配方、战利品表或 mcfunction。常用属性可以直接表单编辑，高级 JSON 默认折叠。"
-                    actionLabel="去创建元素"
+                    title="放置方块与物品"
+                    text="在“方块/物品”页新建物品、方块、状态效果、药水、附魔、配方、战利品表或 mcfunction。常用属性用表单编辑，高级 JSON 默认折叠。"
+                    actionLabel="去放置元素"
                     onAction={() => setActiveView('elements')}
                   />
                   <TutorialStep
                     number="3"
-                    title="导入或绘制贴图"
-                    text="在“资源”页导入 PNG，或用内置像素绘制器制作 16x16、32x32、64x64 贴图。保存后会自动绑定到当前元素。"
-                    actionLabel="去做贴图"
+                    title="制作材质与模型"
+                    text="在“材质资源”页导入 PNG，或用内置像素绘制器制作 16x16、32x32、64x64 贴图；同一页也能导入和编辑 Blockbench JSON 模型。保存后会自动绑定到当前元素。"
+                    actionLabel="去做资源包"
                     onAction={() => setActiveView('resources')}
                   />
                   <TutorialStep
                     number="4"
-                    title="编辑节点逻辑"
-                    text="在“节点逻辑”页添加事件、条件、动作、变量和 NBT 节点。先在变量面板创建变量，再右键任意节点参数输入框，或者直接点“插变量”按钮即可插入变量；文本参数会写成 ${counter}，数字/布尔参数会写成 var:counter。"
-                    actionLabel="去编辑节点"
+                    title="连接红石逻辑"
+                    text="在“红石逻辑”页添加事件、条件、动作、变量和 NBT 节点。先在变量面板创建变量，再右键任意节点参数输入框，或者直接点“插变量”按钮即可插入变量。"
+                    actionLabel="去连红石"
                     onAction={() => setActiveView('logic')}
                   />
                   <TutorialStep
                     number="5"
-                    title="生成并构建模组"
-                    text="在“Forge 生成”页先生成工程，再构建 jar。构建成功后，jar 会复制到项目 exports 目录。"
-                    actionLabel="去生成构建"
+                    title="锻造 Forge jar"
+                    text="在“锻造导出”页先生成工程，再构建 jar。构建成功后，jar 会复制到项目 exports 目录，也可以用部署脚本送到 .minecraft/mods。"
+                    actionLabel="去锻造导出"
                     onAction={() => setActiveView('forge')}
                   />
                   <TutorialStep
                     number="6"
-                    title="使用 AI 但保留控制权"
-                    text="在“AI 助手”页可以配置本地 Ollama、LM Studio 或 OpenAI-compatible 服务。AI 草案不会直接写 Java；应用前会先校验节点图或展示工程变更计划。"
+                    title="让 AI 当制图台助手"
+                    text="在“AI 助手”页可以配置 MIMO、Ollama、LM Studio 或其他 OpenAI-compatible 服务。AI 草案不会直接写 Java；应用前会先校验节点图或展示工程变更计划。"
                     actionLabel="打开 AI 助手"
                     onAction={() => setActiveView('ai')}
                   />
@@ -2979,6 +3335,29 @@ export default function App() {
                 <div className="hint">生成 Forge 工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>
                 <pre className="data-preview">{project ? `输出文件：\n${projectDir}\\generated\\forge\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\forge\\blockforge-setup-env.ps1\n${projectDir}\\generated\\forge\\blockforge-check-env.ps1\n${projectDir}\\generated\\forge\\blockforge-deploy-local.ps1\n\n常用命令：\ncd ${projectDir}\\generated\\forge\npowershell -ExecutionPolicy Bypass -File .\\blockforge-check-env.ps1\npowershell -ExecutionPolicy Bypass -File .\\blockforge-deploy-local.ps1 -Build` : '先创建或打开项目，再生成 Forge 工程。'}</pre>
               </Panel>
+              <Panel title="发布前隐私检查">
+                <div className="list-panel">
+                  <div className="list-row">
+                    <div>
+                      <strong>本机密钥只存在用户配置目录</strong>
+                      <span>AI API Key 会写入 Electron 的 userData 配置，不会写入项目导出包，也不会进入源码提交。</span>
+                    </div>
+                  </div>
+                  <div className="list-row">
+                    <div>
+                      <strong>项目草稿默认排除</strong>
+                      <span>贴图编辑器草稿、模型编辑器草稿、构建日志、快照和 exports 会被 Git 忽略，避免把本地调试数据推到 GitHub。</span>
+                    </div>
+                  </div>
+                  <div className="list-row">
+                    <div>
+                      <strong>发布前运行扫描</strong>
+                      <span>提交前执行 npm run privacy:scan，检查源码中是否出现 API Key、邮箱、本机用户目录或聊天临时文件路径。</span>
+                    </div>
+                  </div>
+                </div>
+                <pre className="data-preview compact">npm run privacy:scan</pre>
+              </Panel>
             </section>
           )}
 
@@ -3058,7 +3437,7 @@ export default function App() {
           )}
         </section>
 
-        {!textureEditorMode && (
+        {!textureEditorMode && !modelEditorMode && (
         <aside className="rightbar">
           <div className="panel-title">当前上下文</div>
           <label>项目目录</label>
@@ -3081,13 +3460,13 @@ export default function App() {
       {resourceMenu && (
         <div className="context-menu" style={{ left: resourceMenu.x, top: resourceMenu.y }} onClick={event => event.stopPropagation()}>
           <button onClick={() => copyResourcePath(resourceMenu.resource)}>复制资源路径</button>
-          <button onClick={() => duplicateResource(resourceMenu.resource)}>复制为新贴图</button>
+          <button onClick={() => duplicateResource(resourceMenu.resource)}>{resourceMenu.resource.type === 'model' ? '复制为新模型' : '复制为新贴图'}</button>
           <button onClick={() => bindResourceToCurrentElement(resourceMenu.resource)}>绑定到当前元素</button>
           <button onClick={() => deleteResourceFromMenu(resourceMenu.resource)}>删除资源文件</button>
         </div>
       )}
 
-      {!textureEditorMode && (
+      {!textureEditorMode && !modelEditorMode && (
       <footer className="bottom-panel">
         <div className="bottom-tabs">
           {(['logs', 'diagnostics', 'ir', 'code', 'ai'] as BottomId[]).map(tab => (
@@ -3254,6 +3633,62 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
     ...element,
     properties: { ...props, ...itemKindDefaults(kind) }
   });
+  const modelValue = String(props.model ?? '');
+  const potionEffects = Array.isArray(props.effects) ? props.effects as PotionEffectSpec[] : [];
+  const enchantmentSlots = Array.isArray(props.slots) ? props.slots as EnchantmentSlot[] : [];
+  const incompatible = Array.isArray(props.incompatibleWith) ? props.incompatibleWith as string[] : [];
+  const splitMultiValue = (value: string) => value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean);
+  const updatePotionEffect = (index: number, patch: Partial<PotionEffectSpec>) => {
+    onChange({
+      ...element,
+      properties: {
+        ...props,
+        effects: potionEffects.map((effect, currentIndex) => currentIndex === index ? { ...effect, ...patch } : effect)
+      }
+    });
+  };
+  const addPotionEffect = () => {
+    onChange({
+      ...element,
+      properties: {
+        ...props,
+        effects: [
+          ...potionEffects,
+          { effect: 'minecraft:speed', duration: 200, amplifier: 0, ambient: false, visible: true, showIcon: true }
+        ]
+      }
+    });
+  };
+  const removePotionEffect = (index: number) => {
+    onChange({
+      ...element,
+      properties: {
+        ...props,
+        effects: potionEffects.filter((_, currentIndex) => currentIndex !== index)
+      }
+    });
+  };
+  const updateEnchantmentSlots = (value: string) => {
+    const validSlots = new Set<EnchantmentSlot>(['mainhand', 'offhand', 'head', 'chest', 'legs', 'feet', 'any']);
+    onChange({
+      ...element,
+      properties: {
+        ...props,
+        slots: splitMultiValue(value)
+          .map(item => item.toLowerCase() as EnchantmentSlot)
+          .filter(item => validSlots.has(item))
+      }
+    });
+  };
+  const updateIncompatible = (value: string) => {
+    onChange({
+      ...element,
+      properties: {
+        ...props,
+        incompatibleWith: splitMultiValue(value)
+      }
+    });
+  };
   return (
     <div className="quick-editor">
       <div className="panel-title">属性表单</div>
@@ -3288,6 +3723,11 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
           )}
           <BooleanField label="防火物品" value={Boolean(props.fireResistant)} onChange={value => updateProp('fireResistant', value)} />
           <Field label="贴图文件名" value={String(props.texture ?? '')} onChange={value => updateProp('texture', value)} hint="不用写 .png，例如 echo_crystal。" />
+          <Field label="3D模型资源" value={modelValue} onChange={value => updateProp('model', value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="生成到 models/item/ 目录；留空时使用默认物品模型。" />
+          <div className="button-row mini">
+            <button type="button" onClick={() => updateProp('model', `${element.id}_model`)}>生成模型名</button>
+            <button type="button" onClick={() => updateProp('model', '')}>清空模型</button>
+          </div>
           <Field label="右键节点逻辑" value={String(props.rightClickLogic ?? '')} onChange={value => updateProp('rightClickLogic', value)} hint="通常写 item:物品ID，用于绑定节点图。" />
         </>
       )}
@@ -3298,6 +3738,64 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
           <NumberField label="亮度" value={Number(props.lightLevel ?? 0)} onChange={value => updateProp('lightLevel', value)} />
           <Field label="声音类型" value={String(props.soundType ?? 'STONE')} onChange={value => updateProp('soundType', value)} />
           <Field label="全方块贴图文件名" value={String(props.textureAll ?? '')} onChange={value => updateProp('textureAll', value)} hint="不用写 .png，六个面会共用这张贴图。" />
+          <Field label="3D模型资源" value={modelValue} onChange={value => updateProp('model', value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="生成到 models/block/ 目录；留空时使用默认立方体模型。" />
+          <div className="button-row mini">
+            <button type="button" onClick={() => updateProp('model', `${element.id}_model`)}>生成模型名</button>
+            <button type="button" onClick={() => updateProp('model', '')}>清空模型</button>
+          </div>
+        </>
+      )}
+      {element.type === 'mob_effect' && (
+        <>
+          <SelectField label="效果分类" value={String(props.category ?? 'beneficial')} options={mobEffectCategoryLabels} onChange={value => updateProp('category', value)} />
+          <Field label="颜色" value={String(props.color ?? '#7dd3fc')} onChange={value => updateProp('color', value)} />
+          <BooleanField label="瞬时效果" value={Boolean(props.instant)} onChange={value => updateProp('instant', value)} />
+          <BooleanField label="环境效果" value={Boolean(props.ambient)} onChange={value => updateProp('ambient', value)} />
+          <BooleanField label="显示图标" value={Boolean(props.showIcon)} onChange={value => updateProp('showIcon', value)} />
+          <BooleanField label="显示粒子" value={Boolean(props.visible)} onChange={value => updateProp('visible', value)} />
+          <Field label="说明" value={String(props.description ?? '')} onChange={value => updateProp('description', value)} />
+        </>
+      )}
+      {element.type === 'potion' && (
+        <>
+          <SelectField label="药水类型" value={String(props.potionKind ?? 'drinkable')} options={potionKindLabels} onChange={value => updateProp('potionKind', value)} />
+          <Field label="基础药水" value={String(props.basePotion ?? 'minecraft:awkward')} onChange={value => updateProp('basePotion', value)} hint="例如 minecraft:awkward 或 minecraft:healing。" />
+          <Field label="颜色" value={String(props.color ?? '#7dd3fc')} onChange={value => updateProp('color', value)} />
+          <label>效果列表</label>
+          <div className="nested-list">
+            {potionEffects.length === 0 && <div className="tree-empty">暂无效果，点击下方按钮添加。</div>}
+            {potionEffects.map((effect, index) => (
+              <div className="nested-card" key={`${effect.effect}-${index}`}>
+                <Field label="效果" value={effect.effect} onChange={value => updatePotionEffect(index, { effect: value })} />
+                <NumberField label="持续 tick" value={Number(effect.duration ?? 200)} onChange={value => updatePotionEffect(index, { duration: value })} />
+                <NumberField label="等级" value={Number(effect.amplifier ?? 0)} onChange={value => updatePotionEffect(index, { amplifier: value })} />
+                <div className="button-row mini">
+                  <button type="button" onClick={() => updatePotionEffect(index, { ambient: !effect.ambient })}>{effect.ambient ? '取消环境效果' : '环境效果'}</button>
+                  <button type="button" onClick={() => updatePotionEffect(index, { visible: !effect.visible })}>{effect.visible ? '隐藏粒子' : '显示粒子'}</button>
+                  <button type="button" onClick={() => updatePotionEffect(index, { showIcon: !effect.showIcon })}>{effect.showIcon ? '隐藏图标' : '显示图标'}</button>
+                  <button type="button" onClick={() => removePotionEffect(index)}>删除</button>
+                </div>
+              </div>
+            ))}
+            <button type="button" onClick={addPotionEffect}>添加效果</button>
+          </div>
+        </>
+      )}
+      {element.type === 'enchantment' && (
+        <>
+          <SelectField label="稀有度" value={String(props.rarity ?? 'rare')} options={enchantmentRarityLabels} onChange={value => updateProp('rarity', value)} />
+          <NumberField label="最高等级" value={Number(props.maxLevel ?? 3)} onChange={value => updateProp('maxLevel', value)} />
+          <NumberField label="最低成本" value={Number(props.minCost ?? 1)} onChange={value => updateProp('minCost', value)} />
+          <NumberField label="最高成本" value={Number(props.maxCost ?? 25)} onChange={value => updateProp('maxCost', value)} />
+          <BooleanField label="宝藏附魔" value={Boolean(props.treasureOnly)} onChange={value => updateProp('treasureOnly', value)} />
+          <BooleanField label="诅咒" value={Boolean(props.curse)} onChange={value => updateProp('curse', value)} />
+          <BooleanField label="可自然获取" value={Boolean(props.discoverable ?? true)} onChange={value => updateProp('discoverable', value)} />
+          <label>适用槽位</label>
+          <textarea value={enchantmentSlots.join('\n')} onChange={event => updateEnchantmentSlots(event.target.value)} placeholder={'mainhand\noffhand\nchest'} />
+          <div className="hint">可填 mainhand、offhand、head、chest、legs、feet、any，支持多行或逗号分隔。</div>
+          <label>不兼容附魔</label>
+          <textarea value={incompatible.join('\n')} onChange={event => updateIncompatible(event.target.value)} placeholder={'minecraft:sharpness\nminecraft:smite'} />
+          <Field label="说明" value={String(props.description ?? '')} onChange={value => updateProp('description', value)} />
         </>
       )}
       {element.type === 'recipe' && (

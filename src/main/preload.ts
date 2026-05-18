@@ -28,6 +28,9 @@ contextBridge.exposeInMainWorld('blockforge', {
     createRecipe: (payload: unknown) => invoke('elements:createRecipe', payload),
     createLootTable: (payload: unknown) => invoke('elements:createLootTable', payload),
     createFunction: (payload: unknown) => invoke('elements:createFunction', payload),
+    createMobEffect: (payload: unknown) => invoke('elements:createMobEffect', payload),
+    createPotion: (payload: unknown) => invoke('elements:createPotion', payload),
+    createEnchantment: (payload: unknown) => invoke('elements:createEnchantment', payload),
     save: (payload: unknown) => invoke('elements:save', payload),
     duplicate: (payload: unknown) => invoke('elements:duplicate', payload),
     delete: (payload: unknown) => invoke('elements:delete', payload),
@@ -36,15 +39,21 @@ contextBridge.exposeInMainWorld('blockforge', {
   resources: {
     importTexture: (payload: unknown) => invoke('resources:importTexture', payload),
     saveTexture: (payload: unknown) => invoke('resources:saveTexture', payload),
+    importModel: (payload: unknown) => invoke('resources:importModel', payload),
+    saveModel: (payload: unknown) => invoke('resources:saveModel', payload),
     duplicate: (payload: unknown) => invoke('resources:duplicate', payload),
     delete: (payload: unknown) => invoke('resources:delete', payload),
     readIndex: (payload: unknown) => invoke('resources:readIndex', payload),
-    checkMissing: (payload: unknown) => invoke('resources:checkMissing', payload)
+    checkMissing: (payload: unknown) => invoke('resources:checkMissing', payload),
+    readContent: (payload: unknown) => invoke('resources:readContent', payload)
   },
   textureEditor: {
     openWindow: (payload: unknown) => invoke('textureEditor:openWindow', payload),
     readDraft: (payload: unknown) => invoke('textureEditor:readDraft', payload),
     saveDraft: (payload: unknown) => invoke('textureEditor:saveDraft', payload)
+  },
+  modelEditor: {
+    openWindow: (payload: unknown) => invoke('modelEditor:openWindow', payload)
   },
   generate: {
     forge: (payload: unknown) => invoke('generate:forge', payload)

@@ -11,6 +11,7 @@
     "build:main": "tsc -p tsconfig.main.json",
     "build:renderer": "vite build",
     "typecheck": "tsc --noEmit",
+    "privacy:scan": "node scripts/privacy-scan.mjs",
     "start": "npm run build && electron .",
     "start:electron": "npm run build && electron .",
     "preview": "vite preview --host 127.0.0.1"

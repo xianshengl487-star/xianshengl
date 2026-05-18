@@ -56,9 +56,9 @@ export const lmStudioPreset: Omit<AiProviderConfig, 'apiKey'> = {
 
 export const mimoPreset: Omit<AiProviderConfig, 'apiKey'> = {
   provider: 'mimo',
-  displayName: 'MIMO 预设',
-  apiBaseUrl: 'http://127.0.0.1:8000/v1',
-  model: 'mimo-chat',
+  displayName: 'MIMO 云端大模型',
+  apiBaseUrl: 'https://api.xiaomimimo.com/v1',
+  model: 'mimo-v2.5-pro',
   temperature: 0.3,
   maxTokens: 4096,
   stream: false,
