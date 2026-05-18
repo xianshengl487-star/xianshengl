@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "0.1.0",
+  "projectId": "echo_crystal_demo",
+  "displayName": "Echo Crystal Demo",
+  "modId": "echo_crystal_demo",
+  "namespace": "echo_crystal_demo",
+  "packageName": "com.blockforge.echo_crystal_demo",
+  "author": "BlockForge Studio",
+  "description": "??? BlockForge Studio ??????????? MOD?",
+  "minecraftVersion": "1.20.1",
+  "javaVersion": "17",
+  "targetLoaders": [
+    "forge"
+  ],
+  "primaryLoader": "forge",
+  "license": "All Rights Reserved",
+  "createdAt": "2026-05-18T05:14:45.379Z",
+  "updatedAt": "2026-05-18T05:14:45.379Z",
+  "features": {
+    "datapack": true,
+    "resourcepack": true,
+    "aiAssistant": true,
+    "advancedCodeMode": true
+  },
+  "paths": {
+    "editor": "editor",
+    "generated": "generated",
+    "exports": "exports",
+    "snapshots": "editor/snapshots"
+  }
+}

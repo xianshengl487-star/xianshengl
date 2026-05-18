@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "echo_crystal",
+  "namespace": "echo_crystal_demo",
+  "displayName": {
+    "zh_cn": "??????",
+    "en_us": "echo crystal"
+  },
+  "description": "",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-18T05:14:45.389Z",
+  "updatedAt": "2026-05-18T05:14:45.392Z",
+  "type": "recipe",
+  "properties": {
+    "recipeType": "shapeless",
+    "category": "misc",
+    "ingredients": [
+      "minecraft:ender_pearl",
+      "minecraft:amethyst_shard",
+      "echo_crystal_demo:resonance_shard"
+    ],
+    "result": "echo_crystal_demo:echo_crystal",
+    "count": 1
+  }
+}

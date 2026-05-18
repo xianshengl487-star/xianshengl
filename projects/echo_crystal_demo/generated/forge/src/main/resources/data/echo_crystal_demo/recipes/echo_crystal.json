@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "minecraft:ender_pearl"
+    },
+    {
+      "item": "minecraft:amethyst_shard"
+    },
+    {
+      "item": "echo_crystal_demo:resonance_shard"
+    }
+  ],
+  "result": {
+    "item": "echo_crystal_demo:echo_crystal",
+    "count": 1
+  }
+}

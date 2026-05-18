@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "0.1.0",
+  "projectId": "ice_wand_demo",
+  "displayName": "Ice Wand Demo",
+  "modId": "ice_wand_demo",
+  "namespace": "ice_wand_demo",
+  "packageName": "com.blockforge.ice_wand_demo",
+  "author": "BlockForge",
+  "description": "A visual Minecraft mod project created by BlockForge Studio.",
+  "minecraftVersion": "1.20.1",
+  "javaVersion": "17",
+  "targetLoaders": [
+    "forge"
+  ],
+  "primaryLoader": "forge",
+  "license": "All Rights Reserved",
+  "createdAt": "2026-05-14T06:23:53.228Z",
+  "updatedAt": "2026-05-14T06:23:53.228Z",
+  "features": {
+    "datapack": true,
+    "resourcepack": true,
+    "aiAssistant": true,
+    "advancedCodeMode": true
+  },
+  "paths": {
+    "editor": "editor",
+    "generated": "generated",
+    "exports": "exports",
+    "snapshots": "editor/snapshots"
+  }
+}

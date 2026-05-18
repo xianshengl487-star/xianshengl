@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "ice_wand_demo:block/frost_block"
+    }
+  }
+}

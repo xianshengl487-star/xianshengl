@@ -1,0 +1,58 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "echo_resonator_panel",
+  "name": "Echo Resonator Panel",
+  "width": 176,
+  "height": 166,
+  "background": "#1f2937",
+  "widgets": [
+    {
+      "id": "title",
+      "type": "label",
+      "x": 10,
+      "y": 8,
+      "width": 150,
+      "height": 18,
+      "text": "Echo Resonator"
+    },
+    {
+      "id": "crystal_preview",
+      "type": "image",
+      "x": 72,
+      "y": 34,
+      "width": 32,
+      "height": 32,
+      "text": "??",
+      "texture": "echo_crystal"
+    },
+    {
+      "id": "input_slot",
+      "type": "slot",
+      "x": 46,
+      "y": 80,
+      "width": 18,
+      "height": 18,
+      "text": "??"
+    },
+    {
+      "id": "output_slot",
+      "type": "slot",
+      "x": 112,
+      "y": 80,
+      "width": 18,
+      "height": 18,
+      "text": "??"
+    },
+    {
+      "id": "close_button",
+      "type": "button",
+      "x": 56,
+      "y": 132,
+      "width": 64,
+      "height": 20,
+      "text": "??",
+      "action": "close"
+    }
+  ],
+  "updatedAt": "2026-05-18T05:14:45.421Z"
+}

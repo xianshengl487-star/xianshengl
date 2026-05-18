@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "echo_crystal_demo:block/echo_resonance_block"
+    }
+  }
+}

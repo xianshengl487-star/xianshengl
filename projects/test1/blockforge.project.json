@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "0.1.0",
+  "projectId": "test1",
+  "displayName": "test1",
+  "modId": "test1",
+  "namespace": "test1",
+  "packageName": "com.blockforge.test1",
+  "author": "mao",
+  "description": "A visual Minecraft mod project created by BlockForge Studio.",
+  "minecraftVersion": "1.20.1",
+  "javaVersion": "17",
+  "targetLoaders": [
+    "forge"
+  ],
+  "primaryLoader": "forge",
+  "license": "All Rights Reserved",
+  "createdAt": "2026-05-14T06:50:42.194Z",
+  "updatedAt": "2026-05-14T06:50:42.194Z",
+  "features": {
+    "datapack": true,
+    "resourcepack": true,
+    "aiAssistant": true,
+    "advancedCodeMode": true
+  },
+  "paths": {
+    "editor": "editor",
+    "generated": "generated",
+    "exports": "exports",
+    "snapshots": "editor/snapshots"
+  }
+}

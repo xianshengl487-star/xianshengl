@@ -1,0 +1,10 @@
+node_modules/
+dist/
+artifacts/
+projects/*/generated/forge/.gradle/
+projects/*/generated/forge/build/
+projects/*/logs/
+*.log
+*.blockforge.zip
+.DS_Store
+Thumbs.db

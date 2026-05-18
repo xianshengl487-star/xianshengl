@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "Vhuahewu",
+  "namespace": "test1",
+  "displayName": {
+    "zh_cn": "V号化合物",
+    "en_us": "Vhuahewu"
+  },
+  "description": "",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-14T06:51:51.576Z",
+  "updatedAt": "2026-05-18T10:59:35.378Z",
+  "type": "item",
+  "properties": {
+    "itemKind": "food",
+    "maxStackSize": 64,
+    "tier": "DIAMOND",
+    "attackDamage": 4,
+    "attackSpeed": -2.2,
+    "foodNutrition": 4,
+    "foodSaturation": 0.3,
+    "alwaysEat": true,
+    "fireResistant": false,
+    "creativeTab": "test1_tab",
+    "texture": "_huahewu"
+  }
+}

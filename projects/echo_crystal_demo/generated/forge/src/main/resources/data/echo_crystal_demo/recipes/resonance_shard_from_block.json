@@ -1,0 +1,10 @@
+{
+  "type": "minecraft:smelting",
+  "category": "misc",
+  "ingredient": {
+    "item": "echo_crystal_demo:echo_resonance_block"
+  },
+  "result": "echo_crystal_demo:resonance_shard",
+  "experience": 0.7,
+  "cookingtime": 200
+}

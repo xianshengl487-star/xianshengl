@@ -1,0 +1,295 @@
+{
+  "schemaVersion": "0.1.0",
+  "graphId": "logic_1778739833254_b8b7",
+  "name": "Ice wand right click",
+  "eventType": "item_right_click",
+  "boundElement": "item:ice_wand",
+  "enabled": true,
+  "targetLoaders": [
+    "forge"
+  ],
+  "nodes": [
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 40,
+        "y": 120
+      },
+      "params": {},
+      "required": [],
+      "nodeId": "node_1778739833254_c1df",
+      "nodeType": "event.item_right_click",
+      "title": "事件：右键物品",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "执行",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 250,
+        "y": 80
+      },
+      "params": {
+        "level": 10
+      },
+      "required": [
+        "level"
+      ],
+      "nodeId": "node_1778739833254_a504",
+      "nodeType": "condition.player_xp_level_at_least",
+      "title": "判断经验等级",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "true_out",
+          "name": "是",
+          "type": "exec"
+        },
+        {
+          "id": "false_out",
+          "name": "否",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 480,
+        "y": 80
+      },
+      "params": {
+        "cooldownId": "ice_wand"
+      },
+      "required": [
+        "cooldownId"
+      ],
+      "nodeId": "node_1778739833254_063a",
+      "nodeType": "condition.cooldown_ready",
+      "title": "判断冷却结束",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "true_out",
+          "name": "是",
+          "type": "exec"
+        },
+        {
+          "id": "false_out",
+          "name": "否",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 720,
+        "y": 40
+      },
+      "params": {
+        "amount": 10
+      },
+      "required": [
+        "amount"
+      ],
+      "nodeId": "node_1778739833254_2bfa",
+      "nodeType": "action.consume_xp_level",
+      "title": "消耗经验等级",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 920,
+        "y": 40
+      },
+      "params": {
+        "command": "effect give @p minecraft:slowness 3 1"
+      },
+      "required": [
+        "command"
+      ],
+      "nodeId": "node_1778739833254_99ad",
+      "nodeType": "action.execute_command",
+      "title": "执行命令",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 1140,
+        "y": 40
+      },
+      "params": {
+        "cooldownId": "ice_wand",
+        "ticks": 100
+      },
+      "required": [
+        "cooldownId",
+        "ticks"
+      ],
+      "nodeId": "node_1778739833254_3ea5",
+      "nodeType": "action.start_cooldown",
+      "title": "启动冷却",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ]
+    },
+    {
+      "diagnostics": [],
+      "position": {
+        "x": 720,
+        "y": 220
+      },
+      "params": {
+        "text": "需要 10 级经验，并且冷却已经结束。"
+      },
+      "required": [
+        "text"
+      ],
+      "nodeId": "node_1778739833254_b5b5",
+      "nodeType": "action.send_message",
+      "title": "发送聊天消息",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_event_xp",
+      "source": "node_1778739833254_c1df",
+      "sourceHandle": "exec_out",
+      "target": "node_1778739833254_a504",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_xp_cooldown",
+      "source": "node_1778739833254_a504",
+      "sourceHandle": "true_out",
+      "target": "node_1778739833254_063a",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_cooldown_consume",
+      "source": "node_1778739833254_063a",
+      "sourceHandle": "true_out",
+      "target": "node_1778739833254_2bfa",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_consume_command",
+      "source": "node_1778739833254_2bfa",
+      "sourceHandle": "exec_out",
+      "target": "node_1778739833254_99ad",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_command_cooldown",
+      "source": "node_1778739833254_99ad",
+      "sourceHandle": "exec_out",
+      "target": "node_1778739833254_3ea5",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_xp_denied",
+      "source": "node_1778739833254_a504",
+      "sourceHandle": "false_out",
+      "target": "node_1778739833254_b5b5",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_cooldown_denied",
+      "source": "node_1778739833254_063a",
+      "sourceHandle": "false_out",
+      "target": "node_1778739833254_b5b5",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    }
+  ],
+  "variables": [],
+  "resources": [],
+  "diagnostics": [],
+  "generatedCodeCache": {},
+  "editorView": {
+    "zoom": 1,
+    "position": {
+      "x": 0,
+      "y": 0
+    },
+    "groups": []
+  }
+}

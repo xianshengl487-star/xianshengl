@@ -1,0 +1,23 @@
+plugins { id 'net.minecraftforge.gradle' version '[6.0,6.2)' }
+
+group='com.blockforge.ice_wand_demo'
+version='1.0.0'
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(17) }
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+minecraft { mappings channel: 'official', version: '1.20.1' }
+
+repositories {
+    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }
+    maven { name = 'Aliyun Central'; url = uri('https://maven.aliyun.com/repository/central') }
+    maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }
+    mavenCentral()
+}
+
+dependencies { minecraft 'net.minecraftforge:forge:1.20.1-47.2.0' }
+
+jar { manifest { attributes(['Specification-Title': 'ice_wand_demo', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) } }
