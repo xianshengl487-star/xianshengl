@@ -1100,6 +1100,34 @@ label {
   margin-top: 12px;
 }
 
+.privacy-result {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--preview-bg);
+  color: var(--muted-color);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.privacy-result strong {
+  color: var(--text-color);
+  font-size: 13px;
+}
+
+.privacy-result.pass {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.privacy-result.fail {
+  border-color: #fca5a5;
+  background: #fff1f2;
+}
+
 .format-rules {
   display: grid;
   gap: 6px;

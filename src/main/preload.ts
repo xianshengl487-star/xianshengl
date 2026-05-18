@@ -53,7 +53,9 @@ contextBridge.exposeInMainWorld('blockforge', {
     saveDraft: (payload: unknown) => invoke('textureEditor:saveDraft', payload)
   },
   modelEditor: {
-    openWindow: (payload: unknown) => invoke('modelEditor:openWindow', payload)
+    openWindow: (payload: unknown) => invoke('modelEditor:openWindow', payload),
+    readDraft: (payload: unknown) => invoke('modelEditor:readDraft', payload),
+    saveDraft: (payload: unknown) => invoke('modelEditor:saveDraft', payload)
   },
   generate: {
     forge: (payload: unknown) => invoke('generate:forge', payload)
@@ -100,6 +102,9 @@ contextBridge.exposeInMainWorld('blockforge', {
   templates: {
     import: (payload: unknown) => invoke('templates:import', payload),
     list: (payload: unknown) => invoke('templates:list', payload)
+  },
+  privacy: {
+    scan: () => invoke('privacy:scan')
   },
   system: {
     openPath: (payload: unknown) => invoke('system:openPath', payload)

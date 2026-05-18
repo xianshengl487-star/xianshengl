@@ -166,6 +166,17 @@ type ModelEditorDraft = {
   updatedAt?: string;
 };
 
+type PrivacyScanResult = {
+  ok: boolean;
+  rootDir: string;
+  scannedFiles: number;
+  findings: Array<{
+    type: string;
+    file: string;
+    line: number;
+  }>;
+};
+
 const api = window.blockforge;
 const textureEditorMode = new URLSearchParams(window.location.search).get('textureEditor') === '1';
 const modelEditorMode = new URLSearchParams(window.location.search).get('modelEditor') === '1';
@@ -538,6 +549,7 @@ export default function App() {
   const [aiScannedFiles, setAiScannedFiles] = useState<string[]>([]);
   const [aiAvailableModels, setAiAvailableModels] = useState<string[]>([]);
   const [appSettings, setAppSettings] = useState<AppSettings>(defaultAppSettings);
+  const [privacyResult, setPrivacyResult] = useState<PrivacyScanResult | null>(null);
 
   const [displayName, setDisplayName] = useState('Ice Wand Demo');
   const [modId, setModId] = useState('ice_wand_demo');
@@ -876,8 +888,11 @@ export default function App() {
     setDisplayName(result.project.displayName);
     setActiveView(textureEditorMode || modelEditorMode ? 'resources' : 'elements');
     pushLog(`已打开项目：${result.project.displayName}，目录：${result.projectDir}。`);
+    setTextureDraftLoaded(false);
+    setModelDraftLoaded(false);
     await refreshProjectData(result.projectDir);
     await loadTextureDraft(result.projectDir);
+    await loadModelDraft(result.projectDir);
     setRecent(await api!.project.readRecent());
   }
 
@@ -937,6 +952,14 @@ export default function App() {
     }, 500);
     return () => window.clearTimeout(timer);
   }, [api, project, projectDir, textureColor, textureDraftLoaded, textureName, textureOwner, texturePixelScale, texturePixels, textureSize, textureTool, textureUsage]);
+
+  useEffect(() => {
+    if (!api || !project || !modelDraftLoaded) return;
+    const timer = window.setTimeout(() => {
+      void persistModelDraft();
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [api, project, projectDir, modelDraftLoaded, modelJson, modelName, modelOwner, modelUsage]);
 
   useEffect(() => {
     if (!api) return;
@@ -1238,6 +1261,7 @@ export default function App() {
         applyTextureDraft(draft);
         pushLog(`已载入贴图草稿：${draft.textureName || '未命名'}。`);
       }
+      setTextureDraftLoaded(true);
     } catch {
       setTextureDraftLoaded(true);
     }
@@ -1292,13 +1316,41 @@ export default function App() {
     });
   }
 
-  function modelDraft() {
+  function modelDraft(): ModelEditorDraft {
     return {
       modelName,
       modelUsage,
       modelOwner,
       modelJson
     };
+  }
+
+  function applyModelDraft(draft: ModelEditorDraft) {
+    if (!draft) return;
+    if (draft.modelName) setModelName(draft.modelName);
+    if (draft.modelUsage) setModelUsage(draft.modelUsage);
+    if (draft.modelOwner) setModelOwner(draft.modelOwner);
+    if (typeof draft.modelJson === 'string') setModelJson(draft.modelJson);
+    setModelDraftLoaded(true);
+  }
+
+  async function loadModelDraft(targetProjectDir = projectDir) {
+    if (!api || !targetProjectDir) return;
+    try {
+      const draft = await api.modelEditor.readDraft({ projectDir: targetProjectDir });
+      if (draft) {
+        applyModelDraft(draft);
+        pushLog(`已载入模型草稿：${draft.modelName || '未命名'}。`);
+      }
+      setModelDraftLoaded(true);
+    } catch {
+      setModelDraftLoaded(true);
+    }
+  }
+
+  async function persistModelDraft() {
+    if (!api || !project) return;
+    await api.modelEditor.saveDraft({ projectDir, draft: modelDraft() });
   }
 
   function defaultModelJson() {
@@ -1355,6 +1407,7 @@ export default function App() {
       setResources(await api.resources.readIndex({ projectDir }));
       if (resource) {
         await bindModelToElement(modelName);
+        await persistModelDraft();
         pushLog(`已导入 3D 模型 ${modelName}.json 并绑定到 ${modelOwner}。`);
       } else {
         pushLog('模型导入已取消。');
@@ -1380,18 +1433,30 @@ export default function App() {
       setResources(await api.resources.readIndex({ projectDir }));
       setModelJson(payloadJson);
       setModelDraftLoaded(true);
+      await api.modelEditor.saveDraft({ projectDir, draft: { ...modelDraft(), modelJson: payloadJson } });
       pushLog(`已保存 3D 模型 ${modelName}.json，并自动绑定到 ${modelOwner}。`);
     });
   }
 
+  async function saveModelEditorDraft() {
+    await runAction('保存模型草稿', async () => {
+      if (!api || !project) return;
+      await persistModelDraft();
+      pushLog(`模型草稿已保存：${modelName || '未命名'}。`);
+    });
+  }
+
   async function resetModelDraft() {
-    setModelJson(defaultModelJson());
+    const nextJson = defaultModelJson();
+    setModelJson(nextJson);
     setModelDraftLoaded(true);
+    if (api && project) await api.modelEditor.saveDraft({ projectDir, draft: { ...modelDraft(), modelJson: nextJson } });
   }
 
   async function openModelEditorWindow() {
     await runAction('打开独立模型窗口', async () => {
       if (!api || !project) return;
+      await persistModelDraft();
       await api.modelEditor.openWindow({ projectDir });
       pushLog('已打开独立 3D 模型编辑窗口。');
     });
@@ -1568,6 +1633,29 @@ export default function App() {
       if (!api) return;
       await api.system.openPath({ targetPath });
       pushLog(`已打开文件夹：${targetPath}`);
+    });
+  }
+
+  async function runPrivacyScan() {
+    await runAction('发布前隐私检查', async () => {
+      if (!api) return;
+      const result = await api.privacy.scan();
+      setPrivacyResult(result);
+      if (result.ok) {
+        setDiagnostics([]);
+        pushLog(`隐私检查通过：扫描 ${result.scannedFiles} 个文件，没有发现明显密钥、邮箱或本机路径。`);
+        return;
+      }
+      const nextDiagnostics: Diagnostic[] = result.findings.map(finding => ({
+        level: 'error',
+        code: 'PRIVACY_SCAN_FINDING',
+        target: `${finding.file}:${finding.line}`,
+        message: `发现 ${finding.type}`,
+        humanAdvice: '提交到 GitHub 前请移除或改成本机配置、示例占位符。'
+      }));
+      setDiagnostics(nextDiagnostics);
+      setBottomTab('diagnostics');
+      pushLog(`隐私检查未通过：发现 ${result.findings.length} 处疑似隐私内容，请先处理。`);
     });
   }
 
@@ -2757,6 +2845,7 @@ export default function App() {
                 <div className="button-row">
                   <button onClick={importModel} disabled={!project || Boolean(busy)}>导入 JSON 并绑定</button>
                   <button onClick={saveModelDraft} disabled={!project || Boolean(busy)}>保存模型</button>
+                  <button onClick={saveModelEditorDraft} disabled={!project || Boolean(busy)}>保存草稿</button>
                   <button onClick={resetModelDraft} disabled={!project || Boolean(busy)}>填充模板</button>
                   <button onClick={openModelEditorWindow} disabled={!project || Boolean(busy)}>弹出独立窗口</button>
                 </div>
@@ -3356,6 +3445,22 @@ export default function App() {
                     </div>
                   </div>
                 </div>
+                <div className="button-row">
+                  <button onClick={runPrivacyScan} disabled={!canUseBridge || Boolean(busy)}>运行隐私检查</button>
+                </div>
+                {privacyResult && (
+                  <div className={`privacy-result ${privacyResult.ok ? 'pass' : 'fail'}`}>
+                    <strong>{privacyResult.ok ? '检查通过' : '需要处理'}</strong>
+                    <span>扫描目录：{privacyResult.rootDir}</span>
+                    <span>扫描文件：{privacyResult.scannedFiles} 个；发现：{privacyResult.findings.length} 处</span>
+                    {privacyResult.findings.length > 0 && (
+                      <pre className="data-preview compact">
+                        {privacyResult.findings.slice(0, 20).map(finding => `${finding.type}: ${finding.file}:${finding.line}`).join('\n')}
+                        {privacyResult.findings.length > 20 ? '\n...还有更多结果，请查看诊断面板。' : ''}
+                      </pre>
+                    )}
+                  </div>
+                )}
                 <pre className="data-preview compact">npm run privacy:scan</pre>
               </Panel>
             </section>

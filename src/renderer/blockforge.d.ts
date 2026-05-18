@@ -66,6 +66,25 @@ type TextureEditorDraft = {
   updatedAt?: string;
 };
 
+type ModelEditorDraft = {
+  modelName: string;
+  modelUsage: 'item_model' | 'block_model';
+  modelOwner: string;
+  modelJson: string;
+  updatedAt?: string;
+};
+
+type PrivacyScanResult = {
+  ok: boolean;
+  rootDir: string;
+  scannedFiles: number;
+  findings: Array<{
+    type: string;
+    file: string;
+    line: number;
+  }>;
+};
+
 declare global {
   interface Window {
     blockforge?: {
@@ -116,6 +135,8 @@ declare global {
       };
       modelEditor: {
         openWindow(payload: { projectDir: string }): Promise<boolean>;
+        readDraft(payload: { projectDir: string }): Promise<ModelEditorDraft | null>;
+        saveDraft(payload: { projectDir: string; draft: ModelEditorDraft }): Promise<string>;
       };
       generate: {
         forge(payload: { projectDir: string }): Promise<{ root: string; copiedResources: number; resourceDiagnostics: Diagnostic[] }>;
@@ -158,6 +179,9 @@ declare global {
       templates: {
         import(payload: { projectDir: string; sourceFile?: string }): Promise<InstalledTemplate | null>;
         list(payload: { projectDir: string }): Promise<InstalledTemplate[]>;
+      };
+      privacy: {
+        scan(): Promise<PrivacyScanResult>;
       };
       system: {
         openPath(payload: { targetPath: string }): Promise<boolean>;

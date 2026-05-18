@@ -28,6 +28,7 @@ import { generateForgeEventHandler } from '../core/generator/forge/forgeEventGen
 import { createAssistantReply, createLogicDraft, createProjectChangePlan, listModels, testConnection } from '../core/ai/aiService';
 import { applyProjectChangePlan, collectProjectFilesForAi, validateProjectChangePlan } from '../core/ai/projectChangeService';
 import { exportProjectZip } from '../core/export/exportService';
+import { runPrivacyScan } from '../core/privacy/privacyScanService';
 import { createSnapshot, listSnapshots, restoreSnapshot } from '../core/snapshot/snapshotService';
 import { importTemplatePackage, listTemplates } from '../core/templates/templateService';
 import { createDefaultUiScreen, loadUiScreens, saveUiScreen } from '../core/ui/uiService';
@@ -361,6 +362,14 @@ function registerIpc() {
     openModelEditorWindow(input.projectDir);
     return true;
   });
+  ipcMain.handle('modelEditor:readDraft', async (_event, input: { projectDir: string }) => {
+    return readJson(path.join(input.projectDir, 'editor/resources/model-editor-draft.json'), null);
+  });
+  ipcMain.handle('modelEditor:saveDraft', async (_event, input: { projectDir: string; draft: unknown }) => {
+    const file = path.join(input.projectDir, 'editor/resources/model-editor-draft.json');
+    await writeJson(file, { ...(input.draft as Record<string, unknown>), updatedAt: new Date().toISOString() });
+    return file;
+  });
   ipcMain.handle('textureEditor:readDraft', async (_event, input: { projectDir: string }) => {
     return readJson(path.join(input.projectDir, 'editor/resources/texture-editor-draft.json'), null);
   });
@@ -458,6 +467,7 @@ function registerIpc() {
     return importTemplatePackage(input.projectDir, sourceFile);
   });
   ipcMain.handle('templates:list', async (_event, input: { projectDir: string }) => listTemplates(input.projectDir));
+  ipcMain.handle('privacy:scan', async () => runPrivacyScan(path.resolve(__dirname, '../..')));
   ipcMain.handle('system:openPath', async (_event, input: { targetPath: string }) => {
     await fs.mkdir(input.targetPath, { recursive: true });
     const result = await shell.openPath(input.targetPath);
