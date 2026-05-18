@@ -14,6 +14,7 @@
   --input-bg: #ffffff;
   --preview-bg: #f6f8fb;
   --accent-color: #2563eb;
+  --surface-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 26px rgba(15, 23, 42, 0.05);
   color: var(--text-color);
   background: var(--app-background-color);
   font-family: "Segoe UI", Arial, sans-serif;
@@ -46,11 +47,13 @@ button {
   color: var(--text-color);
   background: var(--button-bg);
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
 button:hover:not(:disabled) {
   background: var(--button-hover-bg);
   border-color: var(--accent-color);
+  box-shadow: var(--surface-shadow);
 }
 
 button:disabled {
@@ -68,6 +71,14 @@ textarea {
   background: var(--input-bg);
   outline: none;
   padding: 8px 10px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12);
 }
 
 textarea {
@@ -296,6 +307,7 @@ label {
   border-radius: 8px;
   padding: 16px;
   background: var(--panel-bg);
+  box-shadow: var(--surface-shadow);
 }
 
 .recent-list {
@@ -620,6 +632,7 @@ label {
   padding: 8px;
   text-align: left;
   background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .resource-row strong,
@@ -646,7 +659,7 @@ label {
   border: 1px solid var(--border-strong-color);
   border-radius: 8px;
   background: #ffffff;
-  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.18);
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.14);
 }
 
 .context-menu button {
@@ -717,6 +730,7 @@ label {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .tutorial-number {
@@ -752,6 +766,7 @@ label {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .permission-box span,
@@ -769,6 +784,10 @@ label {
   background: #fffbeb;
 }
 
+.permission-box {
+  background: #f8fbff;
+}
+
 .chat-panel {
   display: grid;
   gap: 8px;
@@ -778,6 +797,7 @@ label {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .chat-message {
@@ -816,6 +836,7 @@ label {
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: #ffffff;
+  box-shadow: var(--surface-shadow);
 }
 
 .setup-snippets strong {

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
-import { deepSeekPreset, lmStudioPreset, ollamaPreset } from '../shared/types/ai';
+import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../shared/types/ai';
 import type { AiChatMessage, AiProjectChangePlan, AiProviderConfig } from '../shared/types/ai';
 import type { Diagnostic, ElementModel, ItemKind, RecipeType, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
@@ -50,7 +50,16 @@ type InstalledTemplate = {
 type AppSettings = {
   autoBuildAfterGenerate: boolean;
   backgroundColor: string;
+  aiPermissions: AiPermissions;
   completedProjects: CompletedProject[];
+};
+
+type AiPermissions = {
+  chat: boolean;
+  readProjectContext: boolean;
+  logicDraft: boolean;
+  projectPlan: boolean;
+  applyProjectPlan: boolean;
 };
 
 type CompletedProject = {
@@ -200,7 +209,15 @@ const gameNodeGroups = [
   { title: '世界动作', nodes: [['action.play_sound', '播放音效'], ['action.spawn_particle', '生成粒子'], ['action.set_block', '设置方块'], ['action.summon_entity', '召唤实体']] },
   { title: '游戏判断', nodes: [['condition.player_has_item', '拥有物品'], ['condition.block_is', '脚下方块'], ['condition.biome_is', '所在群系'], ['condition.entity_type_is', '实体类型']] }
 ] as const;
-const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', completedProjects: [] };
+const defaultAiPermissions: AiPermissions = {
+  chat: true,
+  readProjectContext: true,
+  logicDraft: true,
+  projectPlan: false,
+  applyProjectPlan: false
+};
+
+const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', aiPermissions: defaultAiPermissions, completedProjects: [] };
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -339,6 +356,7 @@ function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
   return {
     ...defaultAppSettings,
     ...settings,
+    aiPermissions: { ...defaultAiPermissions, ...(settings.aiPermissions || {}) },
     completedProjects: Array.isArray(settings.completedProjects) ? settings.completedProjects : []
   };
 }
@@ -407,7 +425,7 @@ function createUiWidget(type: UiWidgetType, index: number): UiWidget {
 }
 
 function providerNeedsApiKey(config: AiProviderConfig) {
-  return config.provider !== 'ollama' && config.provider !== 'lmstudio';
+  return config.provider !== 'ollama' && config.provider !== 'lmstudio' && config.provider !== 'mimo';
 }
 
 function withApiKey(preset: Omit<AiProviderConfig, 'apiKey'>, apiKey = ''): AiProviderConfig {
@@ -1837,9 +1855,39 @@ export default function App() {
     pushLog(`已切换 AI 预设：${preset.displayName}。`);
   }
 
+  function aiProjectContext() {
+    if (!appSettings.aiPermissions.readProjectContext) {
+      return {
+        project: project ? { displayName: project.displayName, modId: project.modId, minecraftVersion: project.minecraftVersion } : null,
+        activeView,
+        counts: {
+          elements: allElements.length,
+          resources: resources.resources.length,
+          graphs: graphs.length,
+          uiScreens: uiScreens.length
+        },
+        permission: 'restricted'
+      };
+    }
+    return {
+      project,
+      activeView,
+      currentElement: draftElement ? `${draftElement.type}:${draftElement.id}` : null,
+      elementCount: allElements.length,
+      resourceCount: resources.resources.length,
+      graphCount: graphs.length,
+      uiScreenCount: uiScreens.length,
+      diagnostics: diagnostics.slice(0, 12)
+    };
+  }
+
   async function sendAiChat() {
     await runAction('发送 AI 对话', async () => {
       if (!api || !aiChatInput.trim()) return;
+      if (!appSettings.aiPermissions.chat) {
+        reportError('发送 AI 对话', new Error('当前已关闭 AI 对话权限。'));
+        return;
+      }
       const userMessage: AiChatMessage = { role: 'user', content: aiChatInput.trim() };
       const nextMessages = [...aiChatMessages, userMessage];
       setAiChatMessages(nextMessages);
@@ -1847,16 +1895,7 @@ export default function App() {
       const reply = await api.ai.chat({
         config: aiConfig,
         messages: nextMessages,
-        context: {
-          project,
-          activeView,
-          currentElement: draftElement ? `${draftElement.type}:${draftElement.id}` : null,
-          elementCount: allElements.length,
-          resourceCount: resources.resources.length,
-          graphCount: graphs.length,
-          uiScreenCount: uiScreens.length,
-          diagnostics: diagnostics.slice(0, 12)
-        }
+        context: aiProjectContext()
       });
       const updatedMessages = [...nextMessages, { role: 'assistant', content: reply } as AiChatMessage];
       setAiChatMessages(updatedMessages);
@@ -1883,10 +1922,18 @@ export default function App() {
   async function createAiDraft() {
     await runAction('生成 AI 节点草案', async () => {
       if (!api) return;
+      if (!appSettings.aiPermissions.logicDraft) {
+        reportError('生成 AI 节点草案', new Error('当前已关闭节点草案权限。'));
+        return;
+      }
       const draft = await api.ai.createLogicDraft({
         config: aiConfig,
         prompt: aiPrompt,
-        context: { project, currentGraph, availableElements: allElements.map(element => `${element.type}:${element.id}`) }
+        context: {
+          ...aiProjectContext(),
+          currentGraph: appSettings.aiPermissions.readProjectContext ? currentGraph : null,
+          availableElements: allElements.map(element => `${element.type}:${element.id}`)
+        }
       }) as AiLogicDraft;
       setAiDraft(draft);
       setAiOutput(pretty(draft));
@@ -1929,16 +1976,27 @@ export default function App() {
   async function createAiProjectPlan() {
     await runAction('生成 AI 工程变更计划', async () => {
       if (!api || !project) return;
+      if (!appSettings.aiPermissions.projectPlan) {
+        reportError('生成 AI 工程变更计划', new Error('当前已关闭工程变更计划权限。'));
+        return;
+      }
       const result = await api.ai.createProjectChangePlan({
         projectDir,
         config: aiConfig,
         prompt: aiProjectPrompt,
-        context: {
+        context: appSettings.aiPermissions.readProjectContext ? {
           project,
           elementCount: allElements.length,
           resources: resources.resources.map(resource => ({ path: resource.path, usage: resource.usage, ownerElement: resource.ownerElement })),
           graphs: graphs.map(graph => ({ graphId: graph.graphId, name: graph.name, boundElement: graph.boundElement, nodes: graph.nodes.length, edges: graph.edges.length })),
           uiScreens: uiScreens.map(screen => ({ id: screen.id, name: screen.name, widgets: screen.widgets.length }))
+        } : {
+          project: project ? { displayName: project.displayName, modId: project.modId, minecraftVersion: project.minecraftVersion } : null,
+          elementCount: allElements.length,
+          resourceCount: resources.resources.length,
+          graphCount: graphs.length,
+          uiScreenCount: uiScreens.length,
+          permission: 'restricted'
         }
       });
       setAiProjectPlan(result.plan);
@@ -1956,6 +2014,10 @@ export default function App() {
 
   async function applyAiProjectPlan() {
     if (!aiProjectPlan) return;
+    if (!appSettings.aiPermissions.applyProjectPlan) {
+      reportError('应用 AI 工程变更计划', new Error('当前已关闭直接应用工程变更计划的权限。'));
+      return;
+    }
     const changedCount = aiProjectPlan.files.length;
     const ok = window.confirm(`AI 将修改整个 BlockForge 项目编辑文件。\n\n标题：${aiProjectPlan.title}\n风险：${aiProjectPlan.riskLevel}\n影响文件：${changedCount} 个\n\n应用前会自动创建快照。确认应用吗？`);
     if (!ok) {
@@ -2638,6 +2700,7 @@ export default function App() {
                 <div className="button-row wrap">
                   <button onClick={() => applyAiPreset(ollamaPreset)}>使用 Ollama 本地免费模型</button>
                   <button onClick={() => applyAiPreset(lmStudioPreset)}>使用 LM Studio 本地模型</button>
+                  <button onClick={() => applyAiPreset(mimoPreset)}>使用 MIMO 预设</button>
                   <button onClick={() => applyAiPreset(deepSeekPreset)}>使用 DeepSeek 在线接口</button>
                 </div>
                 <Field label="服务商" value={aiConfig.provider} onChange={value => setAiConfig({ ...aiConfig, provider: value })} />
@@ -2664,7 +2727,18 @@ export default function App() {
                   <code>ollama pull qwen2.5-coder:7b</code>
                   <code>ollama serve</code>
                   <span>LM Studio：打开 Local Server，保持 OpenAI-compatible server 运行，再点击“检测模型”。</span>
+                  <span>MIMO 预设可以直接改接口地址和模型名，适配你的本地或在线 OpenAI-compatible 服务。</span>
                 </div>
+              </Panel>
+              <Panel title="AI 权限">
+                <div className="permission-box">
+                  <BooleanField label="允许 AI 对话" value={appSettings.aiPermissions.chat} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, chat: value } })} />
+                  <BooleanField label="允许读取项目上下文" value={appSettings.aiPermissions.readProjectContext} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, readProjectContext: value } })} />
+                  <BooleanField label="允许生成节点草案" value={appSettings.aiPermissions.logicDraft} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, logicDraft: value } })} />
+                  <BooleanField label="允许生成工程变更计划" value={appSettings.aiPermissions.projectPlan} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, projectPlan: value } })} />
+                  <BooleanField label="允许直接应用工程变更计划" value={appSettings.aiPermissions.applyProjectPlan} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, applyProjectPlan: value } })} />
+                </div>
+                <div className="hint">默认只收紧直接应用权限，聊天和节点草案可用；如果你想让 AI 看得更少，就关闭“读取项目上下文”。</div>
               </Panel>
               <Panel title="免费 AI 对话">
                 <div className="chat-panel">
@@ -2678,7 +2752,7 @@ export default function App() {
                 </div>
                 <textarea value={aiChatInput} onChange={event => setAiChatInput(event.target.value)} placeholder="输入你想问 AI 的问题..." />
                 <div className="button-row wrap">
-                  <button onClick={sendAiChat} disabled={!aiChatInput.trim() || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>发送对话</button>
+                  <button onClick={sendAiChat} disabled={!appSettings.aiPermissions.chat || !aiChatInput.trim() || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>发送对话</button>
                   <button onClick={saveAiChatTranscript} disabled={!project || aiChatMessages.length === 0 || Boolean(busy)}>保存到日志</button>
                   <button onClick={clearAiChat} disabled={Boolean(busy)}>清空对话</button>
                 </div>
@@ -2686,10 +2760,10 @@ export default function App() {
               <Panel title="节点草案">
                 <textarea value={aiPrompt} onChange={event => setAiPrompt(event.target.value)} />
                 <div className="button-row">
-                  <button onClick={createAiDraft} disabled={(providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成 JSON 草案</button>
+                  <button onClick={createAiDraft} disabled={!appSettings.aiPermissions.logicDraft || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成 JSON 草案</button>
                   <button onClick={applyAiDraft} disabled={!project || !aiOutput || Boolean(busy)}>校验并应用到节点图</button>
                 </div>
-                <div className="hint">AI 只能返回节点草案 JSON。应用前会弹窗确认、转换为节点图并校验，不会直接写入 Java。</div>
+                <div className="hint">AI 只能返回节点草案 JSON。应用前会弹窗确认、转换为节点图并校验，不会直接写入 Java。关闭权限后，这里会直接锁定。</div>
                 <pre className="data-preview">{aiOutput || 'AI 节点草案 JSON 会显示在这里。'}</pre>
               </Panel>
               <Panel title="AI 工程大改">
@@ -2702,8 +2776,8 @@ export default function App() {
                   <span>应用前自动创建快照，应用后自动刷新项目并运行健康检查。</span>
                 </div>
                 <div className="button-row wrap">
-                  <button onClick={createAiProjectPlan} disabled={!project || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成工程变更计划</button>
-                  <button onClick={applyAiProjectPlan} disabled={!project || !aiProjectPlan || aiProjectValidation.length > 0 || Boolean(busy)}>确认并应用计划</button>
+                  <button onClick={createAiProjectPlan} disabled={!appSettings.aiPermissions.projectPlan || !project || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成工程变更计划</button>
+                  <button onClick={applyAiProjectPlan} disabled={!appSettings.aiPermissions.applyProjectPlan || !project || !aiProjectPlan || aiProjectValidation.length > 0 || Boolean(busy)}>确认并应用计划</button>
                 </div>
                 {aiScannedFiles.length > 0 && <div className="hint">已扫描 {aiScannedFiles.length} 个工程文件；完整列表在下方预览。</div>}
                 {aiProjectValidation.length > 0 && (

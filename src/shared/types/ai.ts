@@ -54,6 +54,18 @@ export const lmStudioPreset: Omit<AiProviderConfig, 'apiKey'> = {
   compatibleMode: 'openai'
 };
 
+export const mimoPreset: Omit<AiProviderConfig, 'apiKey'> = {
+  provider: 'mimo',
+  displayName: 'MIMO 预设',
+  apiBaseUrl: 'http://127.0.0.1:8000/v1',
+  model: 'mimo-chat',
+  temperature: 0.3,
+  maxTokens: 4096,
+  stream: false,
+  timeoutMs: 120000,
+  compatibleMode: 'openai'
+};
+
 export type AiProjectChangeAction = 'create_or_replace' | 'delete';
 
 export interface AiProjectChangeFile {
