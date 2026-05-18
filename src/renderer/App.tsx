@@ -1555,11 +1555,10 @@ export default function App() {
   }
 
   function updateLogicNode(nodeId: string, patch: Partial<LogicNode>) {
-    if (!currentGraph) return;
-    setCurrentGraph({
-      ...currentGraph,
-      nodes: currentGraph.nodes.map(node => node.nodeId === nodeId ? { ...node, ...patch } : node)
-    });
+    setCurrentGraph(graph => graph ? {
+      ...graph,
+      nodes: graph.nodes.map(node => node.nodeId === nodeId ? { ...node, ...patch } : node)
+    } : graph);
   }
 
   function deleteLogicNode(nodeId: string) {
@@ -1599,6 +1598,27 @@ export default function App() {
     };
     setCurrentGraph({ ...currentGraph, variables: [...currentGraph.variables, variable] });
     pushLog(`已创建本地变量：${variable.name} (${variable.id})。`);
+  }
+
+  function createVariableFromParam(idInput: string, current: unknown) {
+    if (!currentGraph) return false;
+    const id = idInput.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(id)) {
+      reportError('创建变量', new Error('变量 id 只能使用英文字母、数字和下划线，并且不能以数字开头。'));
+      return false;
+    }
+    if (currentGraph.variables.some(variable => variable.id === id)) return true;
+    const type: LogicVariableType = typeof current === 'boolean' ? 'boolean' : typeof current === 'number' ? 'number' : 'string';
+    const variable: LogicVariable = {
+      id,
+      name: id,
+      type,
+      defaultValue: type === 'boolean' ? false : type === 'number' ? 0 : '',
+      scope: 'local'
+    };
+    setCurrentGraph(graph => graph ? { ...graph, variables: graph.variables.some(item => item.id === id) ? graph.variables : [...graph.variables, variable] } : graph);
+    pushLog(`已从节点参数创建变量：${variable.name} (${variable.id})。`);
+    return true;
   }
 
   function updateVariable(id: string, patch: Partial<LogicVariable>) {
@@ -2482,6 +2502,7 @@ export default function App() {
                   node={selectedLogicNode}
                   variables={currentGraph?.variables || []}
                   onChange={patch => updateLogicNode(selectedLogicNode.nodeId, patch)}
+                  onCreateVariable={(id, current) => createVariableFromParam(id, current)}
                   onDelete={() => deleteLogicNode(selectedLogicNode.nodeId)}
                 />
               )}
@@ -3249,7 +3270,7 @@ function LogicEdgesOverlay({ graph }: { graph: LogicGraph }) {
   );
 }
 
-function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: LogicNode; variables: LogicVariable[]; onChange(patch: Partial<LogicNode>): void; onDelete(): void }) {
+function LogicNodeInspector({ node, variables, onChange, onCreateVariable, onDelete }: { node: LogicNode; variables: LogicVariable[]; onChange(patch: Partial<LogicNode>): void; onCreateVariable(id: string, current: unknown): boolean; onDelete(): void }) {
   const updateParam = (key: string, value: string) => onChange({
     params: { ...node.params, [key]: coerceParamValue(node.params[key], value) }
   });
@@ -3264,6 +3285,10 @@ function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: Log
     if (!input) return;
     const trimmed = input.trim();
     const matched = variables.find(variable => variable.id === trimmed || variable.name === trimmed);
+    if (!matched) {
+      const ok = window.confirm(`变量“${trimmed}”还没有创建。\n\n是否现在创建并插入？`);
+      if (!ok || !onCreateVariable(trimmed, current)) return;
+    }
     updateParam(key, formatVariableReferenceForParam(key, current, matched?.id || trimmed));
   };
   return (
