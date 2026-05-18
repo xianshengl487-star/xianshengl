@@ -15,6 +15,12 @@
   --preview-bg: #f6f8fb;
   --accent-color: #2563eb;
   --surface-shadow: 0 1px 0 rgba(255, 255, 255, 0.8) inset, 0 10px 26px rgba(15, 23, 42, 0.05);
+  --shell-topbar-height: 60px;
+  --shell-bottom-height: 220px;
+  --shell-sidebar-padding: 12px;
+  --shell-grid-gap: 16px;
+  --shell-panel-padding: 16px;
+  --shell-view-padding: 16px;
   color: var(--text-color);
   background: var(--app-background-color);
   font-family: "Segoe UI", Arial, sans-serif;
@@ -59,6 +65,13 @@ button:hover:not(:disabled) {
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+button.selected,
+.button-row button.selected {
+  border-color: var(--accent-color);
+  color: #12346b;
+  background: #dbeafe;
 }
 
 input,
@@ -108,9 +121,18 @@ label {
 
 .app-shell {
   display: grid;
-  grid-template-rows: 60px minmax(0, 1fr) 220px;
+  grid-template-rows: var(--shell-topbar-height) minmax(0, 1fr) var(--shell-bottom-height);
   height: 100vh;
   background: var(--app-background-color);
+}
+
+.app-shell.density-compact {
+  --shell-topbar-height: 52px;
+  --shell-bottom-height: 190px;
+  --shell-sidebar-padding: 10px;
+  --shell-grid-gap: 12px;
+  --shell-panel-padding: 13px;
+  --shell-view-padding: 12px;
 }
 
 .topbar {
@@ -193,7 +215,7 @@ label {
 .rightbar {
   min-height: 0;
   overflow: auto;
-  padding: 12px;
+  padding: var(--shell-sidebar-padding);
   background: var(--sidebar-bg);
 }
 
@@ -286,8 +308,8 @@ label {
 
 .view-grid {
   display: grid;
-  gap: 16px;
-  padding: 16px;
+  gap: var(--shell-grid-gap);
+  padding: var(--shell-view-padding);
 }
 
 .view-grid.two {
@@ -305,7 +327,7 @@ label {
 .panel {
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  padding: 16px;
+  padding: var(--shell-panel-padding);
   background: var(--panel-bg);
   box-shadow: var(--surface-shadow);
 }
@@ -1380,4 +1402,27 @@ label {
   font-size: 12px;
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.app-shell.density-compact .topbar {
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+.app-shell.density-compact .bottom-tabs {
+  height: 34px;
+}
+
+.app-shell.density-compact .bottom-panel pre {
+  height: calc(100% - 34px);
+}
+
+.app-shell.density-compact .tabs {
+  height: 42px;
+}
+
+.app-shell.density-compact .tutorial-list,
+.app-shell.density-compact .list-panel,
+.app-shell.density-compact .chat-panel {
+  gap: 6px;
 }

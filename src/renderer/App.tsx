@@ -50,9 +50,12 @@ type InstalledTemplate = {
 type AppSettings = {
   autoBuildAfterGenerate: boolean;
   backgroundColor: string;
+  uiDensity: UiDensity;
   aiPermissions: AiPermissions;
   completedProjects: CompletedProject[];
 };
+
+type UiDensity = 'comfortable' | 'compact';
 
 type AiPermissions = {
   chat: boolean;
@@ -217,7 +220,7 @@ const defaultAiPermissions: AiPermissions = {
   applyProjectPlan: false
 };
 
-const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', aiPermissions: defaultAiPermissions, completedProjects: [] };
+const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', uiDensity: 'comfortable', aiPermissions: defaultAiPermissions, completedProjects: [] };
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -356,6 +359,7 @@ function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
   return {
     ...defaultAppSettings,
     ...settings,
+    uiDensity: settings.uiDensity === 'compact' ? 'compact' : 'comfortable',
     aiPermissions: { ...defaultAiPermissions, ...(settings.aiPermissions || {}) },
     completedProjects: Array.isArray(settings.completedProjects) ? settings.completedProjects : []
   };
@@ -2043,7 +2047,7 @@ export default function App() {
   };
 
   return (
-    <div className={`app-shell ${textureEditorMode ? 'texture-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
+    <div className={`app-shell density-${appSettings.uiDensity} ${textureEditorMode ? 'texture-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
       <header className="topbar">
         <div className="brand">
           <strong>BlockForge Studio</strong>
@@ -2911,6 +2915,25 @@ export default function App() {
                   <button onClick={() => updateAppSettings({ backgroundColor: '#ffffff' })} disabled={!canUseBridge || Boolean(busy)}>恢复白色</button>
                 </div>
                 <div className="hint">默认背景为白色。可以用取色器选择颜色，也可以手动输入十六进制颜色值。</div>
+              </Panel>
+              <Panel title="界面密度">
+                <div className="button-row wrap">
+                  <button
+                    className={appSettings.uiDensity === 'comfortable' ? 'selected' : ''}
+                    onClick={() => void updateAppSettings({ uiDensity: 'comfortable' })}
+                    disabled={!canUseBridge || Boolean(busy)}
+                  >
+                    舒展
+                  </button>
+                  <button
+                    className={appSettings.uiDensity === 'compact' ? 'selected' : ''}
+                    onClick={() => void updateAppSettings({ uiDensity: 'compact' })}
+                    disabled={!canUseBridge || Boolean(busy)}
+                  >
+                    紧凑
+                  </button>
+                </div>
+                <div className="hint">舒展模式更适合长时间编辑；紧凑模式会缩小面板、间距和顶部区域，适合同时看更多节点、属性和日志。</div>
               </Panel>
               <Panel title="部署环境">
                 <div className="hint">生成 Forge 工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>
