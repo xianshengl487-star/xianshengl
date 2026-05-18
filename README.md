@@ -1,46 +1,75 @@
-# BlockForge Studio
+<p align="center">
+  <img src="assets/github-banner.svg" alt="BlockForge Studio banner" width="100%">
+</p>
 
-BlockForge Studio 是一个类似 VS Code 的 Minecraft Forge 模组编辑器。它不是网页玩具，而是面向本地模组制作的桌面工作台：项目管理、元素编辑、贴图绘制、节点逻辑、NBT、界面草图、Forge 工程生成、Gradle 构建和 AI 辅助都放在同一个应用里。
+<h1 align="center">BlockForge Studio</h1>
 
-目标很直接：让不会长期手写 Java 和 JSON 的创作者，也能用中文表单、像素画布和可视化节点把一个 Forge 1.20.1 模组做出来。
+<p align="center">
+  类似 VS Code 的 Minecraft Forge 模组桌面编辑器，把项目、元素、贴图、节点逻辑、GUI、构建和 AI 辅助放进一个工作台。
+</p>
 
-## 主要能力
+<p align="center">
+  <img alt="Electron" src="https://img.shields.io/badge/Electron-Desktop-47848F?style=for-the-badge&logo=electron&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-UI-61DAFB?style=for-the-badge&logo=react&logoColor=111827">
+  <img alt="Forge" src="https://img.shields.io/badge/Forge-1.20.1-F16436?style=for-the-badge">
+  <img alt="Language" src="https://img.shields.io/badge/中文界面-优先-2563EB?style=for-the-badge">
+</p>
 
-- 创建和打开 BlockForge 项目，自动维护目录结构与最近项目。
-- 编辑物品、方块、配方、战利品表和 `mcfunction`。
-- 内置像素绘制器，支持 16x16、32x32、64x64 贴图，并可弹出独立绘制窗口。
-- 资源面板支持导入、绑定、复制、删除、打开引用路径。
-- 节点逻辑支持事件、条件、动作、变量、NBT 标签和 Forge 事件代码预览。
-- 节点参数支持右键插入变量：文本参数使用 `${变量id}`，数字/布尔参数使用 `var:变量id`。
-- 可视化 GUI 草图支持标签、按钮、图片和物品槽等基础控件。
-- 生成 Forge 1.20.1 工程、写入部署命令、构建前快照、保存日志并导出 jar。
-- AI 助手支持本地 Ollama、LM Studio、DeepSeek 或 OpenAI-compatible 接口；AI 大改动会先生成计划并等待确认。
+## 项目定位
 
-## 基本教程
+BlockForge Studio 面向想做 Minecraft Forge 模组、但不想长期手写 Java 和 JSON 的创作者。它提供中文表单、像素画布、节点图、NBT 编辑入口、Forge 工程生成和可控 AI 工作流，让模组制作更像使用一套完整桌面软件。
 
-1. 在“项目”页创建或打开项目，确认模组 ID、包名、作者和描述。
-2. 在“元素”页创建物品或方块，选择类型，例如普通物品、食物、剑、斧、镐、法杖或基础方块。
-3. 在“资源”页导入 PNG，或直接用内置像素绘制器画贴图，并绑定到当前元素。
-4. 在“节点逻辑”页创建变量，再添加事件节点和动作节点。右键节点参数输入框可以直接插入变量。
-5. 点击“校验节点图”和“预览 Forge 代码”，先确认 IR 和 Java 预览没有明显错误。
-6. 在“Forge 生成”页生成工程；需要自动构建时，可以在“设置”里打开“生成后自动构建”。
-7. 构建成功后，jar 会复制到项目的 `exports/` 目录；失败时请查看 `logs/` 中保存的完整构建日志。
+## 亮点
 
-## 启动开发版
+| 模块 | 能力 |
+| --- | --- |
+| 项目工作台 | 创建、打开、最近项目、快照、导出和完成项目列表 |
+| 元素编辑 | 物品、方块、配方、战利品表、`mcfunction` |
+| 资源系统 | PNG 导入、内置像素绘制器、独立贴图窗口、资源右键管理 |
+| 节点逻辑 | 事件、条件、动作、变量、NBT、IR 预览、Forge 事件代码预览 |
+| GUI 草图 | 标签、按钮、图片、物品槽等基础界面模型 |
+| Forge 流程 | Forge 1.20.1 工程生成、部署脚本、Gradle 构建、日志导出 |
+| AI 助手 | Ollama、LM Studio、MIMO、DeepSeek、OpenAI-compatible 预设和权限开关 |
+
+## 快速开始
 
 ```bash
 npm install
 npm run dev
 ```
 
-也可以直接启动桌面壳：
+直接启动桌面壳：
 
 ```bash
 npm run start
 ```
 
-## 说明
+## 推荐工作流
 
-- 当前重点是 Forge 1.20.1。Fabric 类型和目录先保留，暂不作为首版生成目标。
-- Forge 构建依赖 JDK 17；如果检测到更高版本 Java，应用会提示风险并保存构建日志。
-- AI 不会绕过确认直接覆盖工程。节点草案、工程大改动和生成结果都会尽量先经过校验或快照保护。
+1. 在“项目”页创建或打开项目，确认模组 ID、包名、作者和描述。
+2. 在“元素”页创建物品或方块，选择物品细分，例如普通物品、食物、剑、斧、镐、法杖。
+3. 在“资源”页导入 PNG，或用内置像素绘制器绘制贴图并绑定到元素。
+4. 在“节点逻辑”页创建变量、添加事件节点和动作节点。
+5. 使用“校验节点图”和“预览 Forge 代码”检查逻辑。
+6. 在“Forge 生成”页生成工程并构建 jar。
+7. 构建成功后，到 `exports/` 获取模组文件。
+
+## AI 权限模型
+
+AI 能力默认保持受控：
+
+- 节点草案只允许返回 `logic_graph_draft` JSON。
+- 工程大改必须先生成 `project_change_plan`。
+- 应用工程变更前会弹窗确认并创建快照。
+- 设置页可以单独开关对话、项目上下文读取、节点草案、工程计划和应用权限。
+
+## 环境说明
+
+- 当前主目标：Forge 1.20.1。
+- 推荐 JDK：17。
+- Fabric 结构保留，但不是首版生成重点。
+- 如果构建失败，请先查看项目 `logs/` 目录中的完整日志。
+
+## 仓库状态
+
+这个项目仍在持续完善中，首要目标是形成“可运行、可编辑、可生成、可构建或给出清晰错误”的闭环。
