@@ -2771,7 +2771,7 @@ export default function App() {
                   <TutorialStep
                     number="4"
                     title="编辑节点逻辑"
-                    text="在“节点逻辑”页添加事件、条件、动作、变量和 NBT 节点。先在变量面板创建变量，再右键任意节点参数输入框即可插入变量；文本参数会写成 ${counter}，数字/布尔参数会写成 var:counter。"
+                    text="在“节点逻辑”页添加事件、条件、动作、变量和 NBT 节点。先在变量面板创建变量，再右键任意节点参数输入框，或者直接点“插变量”按钮即可插入变量；文本参数会写成 ${counter}，数字/布尔参数会写成 var:counter。"
                     actionLabel="去编辑节点"
                     onAction={() => setActiveView('logic')}
                   />
@@ -3278,28 +3278,31 @@ function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: Log
         {Object.entries(node.params).map(([key, value]) => (
           <label key={key} onContextMenu={event => { event.preventDefault(); insertVariable(key, value); }} title="右键插入变量">
             <span>{key}</span>
-            {key === 'variable' ? (
-              <select value={String(value || '')} onChange={event => updateParam(key, event.target.value)}>
-                <option value="">选择变量</option>
-                {variables.map(variable => <option key={variable.id} value={variable.id}>{variable.name} ({variable.id})</option>)}
-              </select>
-            ) : typeof value === 'boolean' ? (
-              <select value={String(value)} onChange={event => updateParam(key, event.target.value)}>
-                <option value="true">true</option>
-                <option value="false">false</option>
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={String(value ?? '')}
-                onChange={event => updateParam(key, event.target.value)}
-              />
-            )}
+            <div className="node-param-row">
+              {key === 'variable' ? (
+                <select value={String(value || '')} onChange={event => updateParam(key, event.target.value)}>
+                  <option value="">选择变量</option>
+                  {variables.map(variable => <option key={variable.id} value={variable.id}>{variable.name} ({variable.id})</option>)}
+                </select>
+              ) : typeof value === 'boolean' ? (
+                <select value={String(value)} onChange={event => updateParam(key, event.target.value)}>
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={String(value ?? '')}
+                  onChange={event => updateParam(key, event.target.value)}
+                />
+              )}
+              <button type="button" className="small-action" onClick={() => insertVariable(key, value)} title="插入变量">插变量</button>
+            </div>
           </label>
         ))}
         {Object.keys(node.params).length === 0 && <span className="tree-empty">这个节点没有可编辑参数。</span>}
       </div>
-      <div className="hint">右键参数输入框可以直接插入变量；数字和文本参数会自动转成可识别的变量引用。</div>
+      <div className="hint">参数输入框支持右键插入变量，也可以直接点“插变量”按钮；数字、布尔和文本参数会自动转成可识别的变量引用。</div>
       <button onClick={onDelete}>删除节点</button>
     </div>
   );
