@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import type { LoaderId } from '../../shared/types/project';
 import type { LogicGraph } from '../../shared/types/logic';
 import { createNode } from './nodeRegistry';
 
@@ -7,7 +8,7 @@ function nowId() {
   return `${Date.now()}_${Math.random().toString(16).slice(2, 6)}`;
 }
 
-export function createDefaultLogicGraph(name = 'Right click item logic', boundElement = 'item:ice_wand'): LogicGraph {
+export function createDefaultLogicGraph(name = 'Right click item logic', boundElement = 'item:ice_wand', targetLoader: LoaderId = 'forge'): LogicGraph {
   const event = createNode('event.item_right_click');
   const xp = createNode('condition.player_xp_level_at_least');
   const cooldown = createNode('condition.cooldown_ready');
@@ -39,7 +40,7 @@ export function createDefaultLogicGraph(name = 'Right click item logic', boundEl
     eventType: 'item_right_click',
     boundElement,
     enabled: true,
-    targetLoaders: ['forge'],
+    targetLoaders: [targetLoader],
     nodes: [event, xp, cooldown, consume, command, startCooldown, denied],
     edges: [
       { id: 'edge_event_xp', source: event.nodeId, sourceHandle: 'exec_out', target: xp.nodeId, targetHandle: 'exec_in', type: 'exec' },

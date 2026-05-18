@@ -7,7 +7,9 @@ const excludedParts = [
   '.git',
   'editor/ai',
   'logs',
-  'generated/forge/build'
+  'generated/forge/build',
+  'generated/fabric/build',
+  'generated/paper/build'
 ];
 
 function normalize(relativePath: string): string {

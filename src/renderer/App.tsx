@@ -4,7 +4,7 @@ import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../sha
 import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../shared/types/ai';
 import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
-import type { ProjectModel } from '../shared/types/project';
+import { loaderDeployFolder, loaderDisplayName, loaderOutputFolder, loaderShortName, type LoaderId, type ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
 import type { UiScreenModel, UiWidget, UiWidgetType } from '../shared/types/ui';
 
@@ -120,6 +120,12 @@ type ContentKit = {
   view: ViewId;
   tone: 'grass' | 'stone' | 'ore' | 'redstone';
 };
+
+const loaderOptions: Array<{ id: LoaderId; label: string; hint: string }> = [
+  { id: 'forge', label: 'Forge 模组', hint: '适合现有 Forge 流程、事件代码和模组发布。' },
+  { id: 'fabric', label: 'Fabric 模组', hint: '适合更轻量的 Fabric 工程和资源输出。' },
+  { id: 'paper', label: 'Paper 插件', hint: '适合常见的 Bukkit / Spigot / Paper 服务端插件。' }
+];
 
 type AiDraftNode = {
   id?: string;
@@ -249,7 +255,7 @@ const viewLabels: Record<ViewId, string> = {
   resources: '材质资源',
   logic: '红石逻辑',
   ui: 'GUI 容器',
-  forge: '锻造导出',
+  forge: '工程输出',
   ai: 'AI 助手',
   manage: '存档管理',
   settings: '设置/教程'
@@ -258,7 +264,7 @@ const bottomLabels: Record<BottomId, string> = {
   logs: '日志',
   diagnostics: '诊断',
   ir: '中间表示',
-  code: 'Forge 代码',
+  code: '工程代码',
   ai: 'AI 输出'
 };
 const uiWidgetLabels: Record<UiWidgetType, string> = {
@@ -543,6 +549,22 @@ function withApiKey(preset: Omit<AiProviderConfig, 'apiKey'>, apiKey = ''): AiPr
   return { ...preset, apiKey };
 }
 
+function projectTargetLabel(project: ProjectModel | null): string {
+  return project ? loaderDisplayName(project.primaryLoader) : 'Forge 模组';
+}
+
+function projectTargetShort(project: ProjectModel | null): string {
+  return project ? loaderShortName(project.primaryLoader) : 'Forge';
+}
+
+function projectGeneratedRoot(project: ProjectModel | null): string {
+  return project ? loaderOutputFolder(project.primaryLoader) : 'forge';
+}
+
+function projectDeployFolder(project: ProjectModel | null): string {
+  return project ? loaderDeployFolder(project.primaryLoader) : 'mods';
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>(textureEditorMode || modelEditorMode ? 'resources' : 'home');
   const [bottomTab, setBottomTab] = useState<BottomId>('logs');
@@ -576,6 +598,7 @@ export default function App() {
   const [modId, setModId] = useState('ice_wand_demo');
   const [packageName, setPackageName] = useState('com.blockforge.ice_wand_demo');
   const [author, setAuthor] = useState('player');
+  const [projectLoader, setProjectLoader] = useState<LoaderId>('forge');
 
   const [elementKind, setElementKind] = useState<ElementKind>('item');
   const [elementId, setElementId] = useState('ice_wand');
@@ -636,9 +659,9 @@ export default function App() {
   const [aiPrompt, setAiPrompt] = useState('右键冰霜法杖，消耗10级经验，执行冰冻效果命令，然后进入5秒冷却。');
   const [aiTexturePrompt, setAiTexturePrompt] = useState('画一个 16x16 的 Minecraft 冰霜法杖物品贴图，深蓝木柄、浅蓝晶体、雪花高光，适合物品栏显示。');
   const [aiTextureDraft, setAiTextureDraft] = useState<AiTextureDraft | null>(null);
-  const [aiModelPrompt, setAiModelPrompt] = useState('生成一个可在 Blockbench 打开的冰霜法杖 3D 物品模型，细长手柄、顶部蓝色晶体，符合 Forge 1.20.1。');
+  const [aiModelPrompt, setAiModelPrompt] = useState('生成一个可在 Blockbench 打开的冰霜法杖 3D 物品模型，细长手柄、顶部蓝色晶体，符合当前工程目标和 1.20.1。');
   const [aiModelDraft, setAiModelDraft] = useState<AiModelDraft | null>(null);
-  const [aiFeaturePrompt, setAiFeaturePrompt] = useState('设计一个会动起来的魔法方块：周期性发光、粒子、音效、右键切换状态，并给出材质、动画、节点逻辑和 Forge 制作路线。');
+  const [aiFeaturePrompt, setAiFeaturePrompt] = useState('设计一个会动起来的魔法方块：周期性发光、粒子、音效、右键切换状态，并给出材质、动画、节点逻辑和当前工程目标的制作路线。');
   const [aiFeatureDraft, setAiFeatureDraft] = useState<AiModFeatureDraft | null>(null);
   const commandHandlers = useRef<Record<string, () => void>>({});
   const autoOpenedTextureProject = useRef(false);
@@ -722,7 +745,7 @@ export default function App() {
     {
       id: 'project',
       title: '建立项目档案',
-      detail: project ? `当前项目：${project.displayName}，命名空间：${project.modId}` : '还没有打开项目，不能继续生成元素和 Forge 工程。',
+      detail: project ? `当前项目：${project.displayName}，命名空间：${project.modId}，目标：${projectTargetLabel(project)}` : '还没有打开项目，不能继续生成元素和工程。',
       done: Boolean(project),
       view: 'home',
       actionLabel: project ? '查看项目' : '创建项目'
@@ -754,7 +777,7 @@ export default function App() {
     {
       id: 'logic',
       title: '配置交互逻辑',
-      detail: projectStats.graphs > 0 ? `已有 ${projectStats.graphs} 张节点图，可以继续校验和预览 Forge 代码。` : '可以用节点图实现右键、变量、NBT、命令和条件判断。',
+      detail: projectStats.graphs > 0 ? `已有 ${projectStats.graphs} 张节点图，可以继续校验和预览代码。` : '可以用节点图实现右键、变量、NBT、命令和条件判断。',
       done: projectStats.graphs > 0,
       view: 'logic',
       actionLabel: '编辑节点'
@@ -769,22 +792,22 @@ export default function App() {
     },
     {
       id: 'forge',
-      title: '生成并构建 Forge',
-      detail: codePreview ? '已经有代码预览，下一步可以构建 jar。' : '生成 Forge 工程后会写入 Java、资源、Gradle、部署脚本和日志。',
+      title: '生成并构建工程',
+      detail: codePreview ? '已经有代码预览，下一步可以构建 jar。' : '生成工程后会写入 Java、资源、Gradle、部署脚本和日志。',
       done: Boolean(codePreview),
       view: 'forge',
-      actionLabel: '生成 Forge'
+      actionLabel: '生成工程'
     }
   ], [codePreview, elements.lootTables.length, elements.recipes.length, missingTextureElements.length, project, projectStats.elements, projectStats.graphs, projectStats.screens]);
   const designModules = useMemo<DesignModule[]>(() => {
-    const hasForgeOutput = Boolean(project) && (codePreview.length > 0 || diagnostics.some(item => item.code.includes('FORGE') || item.code.includes('BUILD')));
+    const hasProjectOutput = Boolean(project) && (codePreview.length > 0 || diagnostics.some(item => item.code.includes('FORGE') || item.code.includes('BUILD')));
     return [
       {
         id: 'project',
         title: '项目基础',
         status: project ? 'done' : 'todo',
         progress: project ? 100 : 0,
-        summary: project ? `${project.displayName} / ${project.modId}` : '先创建或打开一个 BlockForge 项目。',
+        summary: project ? `${project.displayName} / ${project.modId} / ${projectTargetLabel(project)}` : '先创建或打开一个 BlockForge 项目。',
         nextAction: project ? '继续完善内容' : '创建项目或打开最近项目',
         view: 'home'
       },
@@ -811,7 +834,7 @@ export default function App() {
         title: '节点逻辑',
         status: projectStats.graphs > 0 ? 'active' : projectStats.elements > 0 ? 'todo' : 'blocked',
         progress: Math.min(100, projectStats.graphs * 35),
-        summary: `已有 ${projectStats.graphs} 张节点图；支持变量、NBT、条件、动作和 Forge 预览。`,
+        summary: `已有 ${projectStats.graphs} 张节点图；支持变量、NBT、条件、动作和代码预览。`,
         nextAction: projectStats.graphs > 0 ? '校验并编译为 IR' : '创建示例节点图或让 AI 生成草案',
         view: 'logic'
       },
@@ -827,10 +850,10 @@ export default function App() {
       {
         id: 'forge',
         title: '生成与构建',
-        status: hasForgeOutput ? 'active' : project ? 'todo' : 'blocked',
-        progress: hasForgeOutput ? 70 : 0,
-        summary: '生成 Forge 1.20.1 工程、构建前快照、国内镜像、部署脚本和导出目录。',
-        nextAction: hasForgeOutput ? '运行构建并查看日志' : '生成 Forge 工程',
+        status: hasProjectOutput ? 'active' : project ? 'todo' : 'blocked',
+        progress: hasProjectOutput ? 70 : 0,
+        summary: `生成 ${projectTargetShort(project)} 1.20.1 工程、构建前快照、国内镜像、部署脚本和导出目录。`,
+        nextAction: hasProjectOutput ? '运行构建并查看日志' : '生成工程',
         view: 'forge'
       },
       {
@@ -913,6 +936,7 @@ export default function App() {
     setModId(result.project.modId);
     setPackageName(result.project.packageName);
     setDisplayName(result.project.displayName);
+    setProjectLoader(result.project.primaryLoader);
     setActiveView(textureEditorMode || modelEditorMode ? 'resources' : 'elements');
     pushLog(`已打开项目：${result.project.displayName}，目录：${result.projectDir}。`);
     setTextureDraftLoaded(false);
@@ -998,8 +1022,10 @@ export default function App() {
       'project:new': () => setActiveView('home'),
       'project:open': () => void openProject(openDir || undefined),
       'project:export': () => void exportProjectZip(),
-      'forge:generate': () => void generateForge(),
-      'forge:build': () => void buildJar(),
+      'project:generate': () => void generateProject(),
+      'project:build': () => void buildProjectJar(),
+      'forge:generate': () => void generateProject(),
+      'forge:build': () => void buildProjectJar(),
       'view:ai': () => setActiveView('ai'),
       'view:logic': () => setActiveView('logic'),
       'view:ui': () => setActiveView('ui'),
@@ -1011,7 +1037,7 @@ export default function App() {
   async function createProject() {
     await runAction('创建项目', async () => {
       if (!api) return;
-      const result = await api.project.create({ projectDir, displayName, modId, packageName, author });
+      const result = await api.project.create({ projectDir, displayName, modId, packageName, author, primaryLoader: projectLoader });
       await openProjectResult(result);
     });
   }
@@ -1019,9 +1045,9 @@ export default function App() {
   async function createSampleProject() {
     await runAction('创建示例项目', async () => {
       if (!api) return;
-      const result = await api.project.createSample({ projectDir });
+      const result = await api.project.createSample({ projectDir, primaryLoader: projectLoader });
       await openProjectResult(result);
-      pushLog('示例项目已创建：包含物品、方块、配方、战利品表、函数、节点图、贴图和 Forge 输出。');
+      pushLog(`示例项目已创建：当前目标为 ${projectTargetLabel(result?.project || project)}。`);
     });
   }
 
@@ -1662,29 +1688,38 @@ export default function App() {
     });
   }
 
-  async function generateForge(autoBuildOverride = appSettings.autoBuildAfterGenerate) {
-    const generated = await runAction('生成 Forge', async () => {
+  async function generateProject(autoBuildOverride = appSettings.autoBuildAfterGenerate) {
+    const generated = await runAction('生成工程', async () => {
       if (!api) return;
-      const result = await api.generate.forge({ projectDir });
+      const result = await api.generate.project({ projectDir });
       setDiagnostics(result.resourceDiagnostics || []);
       setResources(await api.resources.readIndex({ projectDir }));
-      pushLog(`Forge 工程已生成：${result.root}。已复制 ${result.copiedResources} 个资源，部署命令已写入 BLOCKFORGE_DEPLOY_COMMANDS.md。`);
+      setCodePreview(result.preview || '');
+      pushLog(`${projectTargetLabel(project)}已生成：${result.root}。已复制 ${result.copiedResources} 个资源，部署命令已写入 BLOCKFORGE_DEPLOY_COMMANDS.md。`);
       setActiveView('forge');
       return result;
     });
     if (generated && autoBuildOverride) {
-      pushLog('已启用自动构建，开始构建 Forge jar。');
-      await buildJar();
+      pushLog(`已启用自动构建，开始构建 ${projectTargetShort(project)} jar。`);
+      await buildProjectJar();
     }
   }
 
-  async function buildJar() {
+  async function buildProjectJar() {
     await runAction('构建 jar', async () => {
       if (!api) return;
       setActiveView('forge');
-      const result = await api.build.forgeJar({ projectDir });
+      const result = await api.build.projectJar({ projectDir });
       pushLog(`构建结果：\n${formatBuildResult(result)}`);
     });
+  }
+
+  async function generateForge(autoBuildOverride = appSettings.autoBuildAfterGenerate) {
+    return generateProject(autoBuildOverride);
+  }
+
+  async function buildJar() {
+    return buildProjectJar();
   }
 
   async function saveCurrentWork() {
@@ -2530,7 +2565,7 @@ export default function App() {
   function sendFeatureToProjectPlanPrompt() {
     if (!aiFeatureDraft) return;
     setAiProjectPrompt([
-      `请按下面的特色玩法方案补全 BlockForge 项目，但不要写 generated/forge：${aiFeatureDraft.title}`,
+      `请按下面的特色玩法方案补全 BlockForge 项目，但不要直接写生成目录：${aiFeatureDraft.title}`,
       aiFeatureDraft.summary,
       '',
       '步骤：',
@@ -2626,15 +2661,15 @@ export default function App() {
             <span className="minecraft-cube grass" />
             <div>
               <strong>BlockForge Studio</strong>
-              <small>像搭方块一样制作 Forge 模组</small>
+              <small>像搭方块一样制作模组与插件</small>
             </div>
           </div>
           <span>{project ? `${project.displayName} / ${project.modId}` : '未打开项目'} · {canUseBridge ? '桌面桥接已就绪' : '桥接不可用'} · {statusMessage}</span>
         </div>
         <div className="top-actions">
           {busy && <span className="busy-pill">处理中：{busy}</span>}
-          <button onClick={() => generateForge()} disabled={!project || Boolean(busy)}>锻造 Forge 工程</button>
-          <button onClick={buildJar} disabled={!project || Boolean(busy)}>打包模组 jar</button>
+          <button onClick={() => generateProject()} disabled={!project || Boolean(busy)}>生成工程</button>
+          <button onClick={buildProjectJar} disabled={!project || Boolean(busy)}>构建 jar</button>
         </div>
       </header>
 
@@ -2707,7 +2742,7 @@ export default function App() {
                     <strong>{designScore}%</strong>
                   </div>
                   <ProgressBar value={designScore} />
-                  <p>把项目当作一个世界存档来搭建：先放方块和物品，再铺材质、红石逻辑、GUI 容器，最后锻造成 Forge 工程。这里会按当前进度提示下一步。</p>
+                  <p>把项目当作一个世界存档来搭建：先放方块和物品，再铺材质、红石逻辑、GUI 容器，最后生成并构建工程。这里会按当前进度提示下一步。</p>
                 </div>
                 <div className="design-flow">
                   {designModules.map((module, index) => (
@@ -2734,12 +2769,12 @@ export default function App() {
                           <button onClick={() => setActiveView(module.view)}>处理</button>
                         </div>
                       ))}
-                      {nextDesignModules.length === 0 && <div className="tree-empty">核心流程已经比较完整。可以生成 Forge、构建 jar，然后加入完成项目列表。</div>}
+                      {nextDesignModules.length === 0 && <div className="tree-empty">核心流程已经比较完整。可以生成工程、构建 jar，然后加入完成项目列表。</div>}
                     </div>
                     <div className="button-row wrap">
                       <button onClick={runProjectHealthCheck} disabled={Boolean(busy)}>项目健康检查</button>
                       <button onClick={saveCurrentWork} disabled={Boolean(busy)}>保存当前工作</button>
-                      <button onClick={() => generateForge(true)} disabled={Boolean(busy)}>锻造并打包</button>
+                      <button onClick={() => generateProject(true)} disabled={Boolean(busy)}>生成并打包</button>
                       <button onClick={() => setActiveView('ai')}>让 AI 巡检蓝图</button>
                     </div>
                   </>
@@ -2811,8 +2846,8 @@ export default function App() {
                 <div className="principle-list">
                   <div><strong>桌面工作台优先</strong><span>保持 VS Code + MCreator 风格，所有工具围绕当前项目展开。</span></div>
                   <div><strong>像红石一样可追踪</strong><span>构建、AI 大改、快照和日志都保留痕迹，方便回退和排错。</span></div>
-                  <div><strong>表单是铁镐，JSON 是钻镐</strong><span>常用属性直接填，高级 JSON 兜底，最终都生成可检查的 Forge 文件。</span></div>
-                  <div><strong>国内网络友好</strong><span>Forge 构建默认偏向国内镜像，失败时保存日志并给出可读原因。</span></div>
+                  <div><strong>表单是铁镐，JSON 是钻镐</strong><span>常用属性直接填，高级 JSON 兜底，最终都生成可检查的工程文件。</span></div>
+                  <div><strong>国内网络友好</strong><span>构建默认偏向国内镜像，失败时保存日志并给出可读原因。</span></div>
                   <div><strong>保留扩展矿道</strong><span>Fabric、多版本加载器、高级 GUI 运行时等先保留结构，不伪装成完整实现。</span></div>
                 </div>
               </Panel>
@@ -2833,14 +2868,14 @@ export default function App() {
                   </div>
                   <div>
                     <strong>{project ? project.displayName : '先放下第一块方块'}</strong>
-                    <span>{project ? `命名空间 ${project.modId} · Forge ${project.minecraftVersion}` : '创建项目后，就能开始制作物品、方块、贴图、红石逻辑和 Forge jar。'}</span>
+                    <span>{project ? `命名空间 ${project.modId} · ${projectTargetLabel(project)} · ${project.minecraftVersion}` : '创建项目后，就能开始制作物品、方块、贴图、红石逻辑和工程打包。'}</span>
                   </div>
                 </div>
                 <div className="button-row wrap">
                   <button onClick={() => setActiveView('design')}>查看玩法蓝图</button>
                   <button onClick={() => setActiveView('elements')} disabled={!project}>创建方块/物品</button>
                   <button onClick={() => setActiveView('resources')} disabled={!project}>制作材质资源</button>
-                  <button onClick={() => generateForge(true)} disabled={!project || Boolean(busy)}>锻造并打包</button>
+                  <button onClick={() => generateProject(true)} disabled={!project || Boolean(busy)}>生成并打包</button>
                 </div>
                 <div className="hint">这里是 BlockForge 的工作台入口：从世界设定到元素、资源、红石节点和导出，都尽量保持可视、可回退、可继续修改。</div>
               </Panel>
@@ -2848,13 +2883,26 @@ export default function App() {
                 <Field label="项目目录" value={projectDir} onChange={setProjectDir} hint="BlockForge 会在这里保存编辑数据、生成工程、构建日志和导出的 jar。" />
                 <Field label="显示名称" value={displayName} onChange={setDisplayName} />
                 <Field label="模组 ID（modId）" value={modId} onChange={setModId} hint="只用小写英文、数字和下划线，例如 echo_crystal_demo。它会成为 Minecraft 资源命名空间。" />
-                <Field label="Java 包名（packageName）" value={packageName} onChange={setPackageName} hint="生成 Forge Java 代码时使用，例如 com.blockforge.echo_crystal_demo。" />
+                <Field label="Java 包名（packageName）" value={packageName} onChange={setPackageName} hint="生成 Java 代码时使用，例如 com.blockforge.echo_crystal_demo。" />
                 <Field label="作者" value={author} onChange={setAuthor} />
+                <label>工程目标</label>
+                <div className="button-row wrap">
+                  {loaderOptions.map(option => (
+                    <button
+                      key={option.id}
+                      className={projectLoader === option.id ? 'selected' : ''}
+                      onClick={() => setProjectLoader(option.id)}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="hint">{loaderOptions.find(option => option.id === projectLoader)?.hint}</div>
                 <div className="button-row">
                   <button onClick={createProject} disabled={!canUseBridge || Boolean(busy)}>创建项目</button>
                   <button onClick={createSampleProject} disabled={!canUseBridge || Boolean(busy)}>一键示例项目</button>
                 </div>
-                <div className="hint">示例项目会自动创建冰霜法杖、霜冻方块、配方、战利品表、函数、节点图、状态效果、药水、附魔和 Forge 工程。</div>
+                <div className="hint">示例项目会根据工程目标自动生成对应骨架；Forge / Fabric 会带上物品、方块、配方和资源，Paper 会生成可运行的服务端插件模板。</div>
               </Panel>
               <Panel title="打开项目">
                 <Field label="项目目录" value={openDir} onChange={setOpenDir} placeholder="留空时打开系统目录选择器" hint="可以打开最近项目，也可以粘贴任意 BlockForge 项目目录。" />
@@ -3091,7 +3139,7 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="hint">首版 Forge 代码生成最完整支持“右键物品”；其他事件会先进入节点图和 IR，作为后续 Forge 事件映射的可视化入口。</div>
+                <div className="hint">首版事件代码生成最完整支持“右键物品”；其他事件会先进入节点图和 IR，作为后续事件映射的可视化入口。</div>
               </div>
               <div className="event-blank-panel">
                 <div className="event-editor-head">
@@ -3276,7 +3324,7 @@ export default function App() {
                     </div>
                   </>
                 )}
-                <div className="hint">首版界面编辑器保存的是 BlockForge 界面模型，可用于设计容器、按钮、图片和槽位布局；Forge 菜单类自动生成会在后续版本接上。</div>
+                <div className="hint">首版界面编辑器保存的是 BlockForge 界面模型，可用于设计容器、按钮、图片和槽位布局；后续会继续补更完整的菜单自动生成。</div>
               </Panel>
               <Panel title="界面画布">
                 {!currentUiScreen && <div className="tree-empty">先创建或选择一个界面。</div>}
@@ -3342,16 +3390,16 @@ export default function App() {
 
           {activeView === 'forge' && (
             <section className="view-grid two">
-              <Panel title="Forge 输出">
-                <button onClick={() => generateForge()} disabled={!project || Boolean(busy)}>生成 Forge 工程</button>
-                <button onClick={buildJar} disabled={!project || Boolean(busy)}>构建 jar</button>
+              <Panel title="工程输出">
+                <button onClick={() => generateProject()} disabled={!project || Boolean(busy)}>生成工程</button>
+                <button onClick={buildProjectJar} disabled={!project || Boolean(busy)}>构建 jar</button>
                 <button onClick={exportProjectZip} disabled={!project || Boolean(busy)}>导出项目 zip</button>
-                <button onClick={() => openPath(`${projectDir}\\generated\\forge`)} disabled={!project || Boolean(busy)}>打开 Forge 目录</button>
+                <button onClick={() => openPath(`${projectDir}\\generated\\${projectGeneratedRoot(project)}`)} disabled={!project || Boolean(busy)}>打开工程目录</button>
                 <button onClick={() => openPath(`${projectDir}\\exports`)} disabled={!project || Boolean(busy)}>打开导出目录</button>
-                <pre className="data-preview">{project ? `${projectDir}\\generated\\forge\n${projectDir}\\generated\\forge\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\forge\\blockforge-setup-env.ps1\n${projectDir}\\generated\\forge\\blockforge-check-env.ps1\n${projectDir}\\generated\\forge\\blockforge-deploy-local.ps1\n${projectDir}\\exports` : '未打开项目。'}</pre>
+                <pre className="data-preview">{project ? `${projectDir}\\generated\\${projectGeneratedRoot(project)}\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-setup-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-check-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-deploy-local.ps1\n${projectDir}\\exports` : '未打开项目。'}</pre>
               </Panel>
               <Panel title="代码预览">
-                <pre className="data-preview">{codePreview || '编译节点图后，这里会显示生成的 Forge 事件代码预览。'}</pre>
+                <pre className="data-preview">{codePreview || '这里会显示生成的工程预览或节点图代码预览。'}</pre>
               </Panel>
             </section>
           )}
@@ -3471,7 +3519,7 @@ export default function App() {
                   <strong>权限边界</strong>
                   <span>AI 会读取当前项目的编辑文件，返回“变更计划”，不会直接写入。</span>
                   <span>允许修改：blockforge.project.json、editor/、src/custom/。</span>
-                  <span>禁止修改：generated/forge、exports、logs、dist、node_modules。</span>
+                  <span>禁止修改：generated、exports、logs、dist、node_modules。</span>
                   <span>应用前自动创建快照，应用后自动刷新项目并运行健康检查。</span>
                 </div>
                 <div className="button-row wrap">
@@ -3520,24 +3568,24 @@ export default function App() {
                 <div className="list-panel">
                   <div className="list-row">
                     <div>
-                      <strong>BlockForge Studio 是一个像 VS Code 一样组织项目、像 MCreator 一样制作模组的桌面工作台。</strong>
-                      <span>你可以把它理解成一张强化工作台：左侧是世界资源树，中间是编辑区域，右侧是属性和检查结果，底部保留日志和 Forge 输出。</span>
+                      <strong>BlockForge Studio 是一个像 VS Code 一样组织项目、像 MCreator 一样制作模组和插件的桌面工作台。</strong>
+                      <span>你可以把它理解成一张强化工作台：左侧是世界资源树，中间是编辑区域，右侧是属性和检查结果，底部保留日志和工程输出。</span>
                     </div>
                   </div>
                   <div className="list-row">
                     <div>
                       <strong>推荐的生存模式流程</strong>
-                      <span>先做物品和方块，再绑定材质或 3D 模型；接着用红石逻辑节点连接事件、条件、变量、NBT 和动作；最后锻造 Forge 工程并构建 jar。</span>
+                      <span>先做物品和方块，再绑定材质或 3D 模型；接着用红石逻辑节点连接事件、条件、变量、NBT 和动作；最后生成工程并构建 jar。</span>
                     </div>
                   </div>
                   <div className="list-row">
                     <div>
                       <strong>当前重点能力</strong>
-                      <span>Forge 1.20.1、中文属性面板、状态效果/药水/附魔、内置像素绘制器、Blockbench JSON 模型、右键资源管理、变量/NBT 节点、AI 草案校验和构建前快照。</span>
+                      <span>Forge / Fabric / Paper、中文属性面板、状态效果/药水/附魔、内置像素绘制器、Blockbench JSON 模型、右键资源管理、变量/NBT 节点、AI 草案校验和构建前快照。</span>
                     </div>
                   </div>
                 </div>
-                <div className="hint">推荐顺序：工作台 → 方块/物品 → 材质资源 → 红石逻辑 → 锻造导出 → 构建/导出。任何生成和 AI 大改动前都会尽量保留快照，方便回退。</div>
+                <div className="hint">推荐顺序：工作台 → 方块/物品 → 材质资源 → 红石逻辑 → 工程输出 → 构建/导出。任何生成和 AI 大改动前都会尽量保留快照，方便回退。</div>
               </Panel>
               <Panel title="新手教程">
                 <div className="tutorial-list">
@@ -3571,9 +3619,9 @@ export default function App() {
                   />
                   <TutorialStep
                     number="5"
-                    title="锻造 Forge jar"
-                    text="在“锻造导出”页先生成工程，再构建 jar。构建成功后，jar 会复制到项目 exports 目录，也可以用部署脚本送到 .minecraft/mods。"
-                    actionLabel="去锻造导出"
+                    title="构建工程 jar"
+                    text="在“工程输出”页先生成工程，再构建 jar。构建成功后，jar 会复制到项目 exports 目录，也可以用部署脚本送到对应目录。"
+                    actionLabel="去工程输出"
                     onAction={() => setActiveView('forge')}
                   />
                   <TutorialStep
@@ -3586,19 +3634,19 @@ export default function App() {
                 </div>
                 <div className="button-row wrap">
                   <button onClick={saveCurrentWork} disabled={!project || Boolean(busy)}>保存当前工作</button>
-                  <button onClick={() => generateForge(true)} disabled={!project || Boolean(busy)}>一键生成并构建</button>
+                  <button onClick={() => generateProject(true)} disabled={!project || Boolean(busy)}>一键生成并构建</button>
                 </div>
               </Panel>
               <Panel title="构建设置">
                 <BooleanField
-                  label="生成 Forge 工程后自动构建模组 jar"
+                  label="生成工程后自动构建 jar"
                   value={appSettings.autoBuildAfterGenerate}
                   onChange={value => void updateAppSettings({ autoBuildAfterGenerate: value })}
                 />
-                <div className="hint">打开后，点击“生成 Forge 工程”会先重新生成工程，再自动运行构建入口。构建前仍会创建快照，并把完整日志保存到 logs 目录。</div>
+                <div className="hint">打开后，点击“生成工程”会先重新生成工程，再自动运行构建入口。构建前仍会创建快照，并把完整日志保存到 logs 目录。</div>
                 <div className="button-row">
                   <button onClick={() => saveAppSettings()} disabled={!canUseBridge || Boolean(busy)}>保存设置</button>
-                  <button onClick={() => generateForge(true)} disabled={!project || Boolean(busy)}>生成 Forge 并自动构建</button>
+                  <button onClick={() => generateProject(true)} disabled={!project || Boolean(busy)}>生成工程并自动构建</button>
                 </div>
               </Panel>
               <Panel title="界面背景">
@@ -3657,8 +3705,8 @@ export default function App() {
                 <div className="hint">可按当前任务把不需要的面板先收起来；如果你在做节点或贴图，通常会更舒服一些。</div>
               </Panel>
               <Panel title="部署环境">
-                <div className="hint">生成 Forge 工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>
-                <pre className="data-preview">{project ? `输出文件：\n${projectDir}\\generated\\forge\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\forge\\blockforge-setup-env.ps1\n${projectDir}\\generated\\forge\\blockforge-check-env.ps1\n${projectDir}\\generated\\forge\\blockforge-deploy-local.ps1\n\n常用命令：\ncd ${projectDir}\\generated\\forge\npowershell -ExecutionPolicy Bypass -File .\\blockforge-check-env.ps1\npowershell -ExecutionPolicy Bypass -File .\\blockforge-deploy-local.ps1 -Build` : '先创建或打开项目，再生成 Forge 工程。'}</pre>
+                <div className="hint">生成工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>
+                <pre className="data-preview">{project ? `输出文件：\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-setup-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-check-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-deploy-local.ps1\n\n常用命令：\ncd ${projectDir}\\generated\\${projectGeneratedRoot(project)}\npowershell -ExecutionPolicy Bypass -File .\\blockforge-check-env.ps1\npowershell -ExecutionPolicy Bypass -File .\\blockforge-deploy-local.ps1 -Build\n\n部署目标：${projectDeployFolder(project)}` : '先创建或打开项目，再生成工程。'}</pre>
               </Panel>
               <Panel title="发布前隐私检查">
                 <div className="list-panel">
@@ -3820,7 +3868,7 @@ export default function App() {
           {bottomTab === 'logs' && logs}
           {bottomTab === 'diagnostics' && (diagnostics.length ? formatDiagnostics(diagnostics) : '暂无诊断。')}
           {bottomTab === 'ir' && (irPreview ? pretty(irPreview) : '暂无中间表示预览。')}
-          {bottomTab === 'code' && (codePreview || '暂无 Forge 代码预览。')}
+          {bottomTab === 'code' && (codePreview || '暂无工程代码预览。')}
           {bottomTab === 'ai' && (aiOutput || '暂无智能助手输出。')}
         </pre>
       </footer>

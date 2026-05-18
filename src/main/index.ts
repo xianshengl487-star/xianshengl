@@ -19,8 +19,8 @@ import {
   saveElement
 } from '../core/elements/elementService';
 import { checkResources, deleteResource, duplicateResource, importModelJson, importTexture, readResourceContent, readResourceIndex, saveModelJson, saveTextureDataUrl } from '../core/resources/resourceService';
-import { generateForgeProject } from '../core/generator/forge/forgeGenerator';
-import { buildForgeJar } from '../core/build/buildService';
+import { generateProjectArtifacts } from '../core/generator/projectGenerator';
+import { buildProjectJar } from '../core/build/buildService';
 import { builtInNodeTypes, createNode } from '../core/logic/nodeRegistry';
 import { createDefaultLogicGraph, loadLogicGraphs, saveLogicGraph } from '../core/logic/logicService';
 import { compileGraphToIR, validateLogicGraph } from '../core/ir/logicCompiler';
@@ -33,6 +33,7 @@ import { createSnapshot, listSnapshots, restoreSnapshot } from '../core/snapshot
 import { importTemplatePackage, listTemplates } from '../core/templates/templateService';
 import { createDefaultUiScreen, loadUiScreens, saveUiScreen } from '../core/ui/uiService';
 import { deepSeekPreset, type AiChatMessage, type AiProviderConfig } from '../shared/types/ai';
+import { type LoaderId } from '../shared/types/project';
 import type { AiProjectChangePlan } from '../shared/types/ai';
 import type { ElementModel } from '../shared/types/elements';
 import type { LogicGraph } from '../shared/types/logic';
@@ -186,8 +187,8 @@ function setupMenu() {
     {
       label: '构建',
       submenu: [
-        { label: '生成 Forge 工程', accelerator: 'CmdOrCtrl+G', click: () => sendCommand('forge:generate') },
-        { label: '构建 jar', accelerator: 'CmdOrCtrl+B', click: () => sendCommand('forge:build') }
+        { label: '生成工程', accelerator: 'CmdOrCtrl+G', click: () => sendCommand('project:generate') },
+        { label: '构建 jar', accelerator: 'CmdOrCtrl+B', click: () => sendCommand('project:build') }
       ]
     },
     {
@@ -206,60 +207,68 @@ function setupMenu() {
   Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 }
 
-async function createSampleProject(projectDir: string) {
+async function createSampleProject(projectDir: string, primaryLoader: LoaderId = 'forge') {
   const project = await createProject(projectDir, 'Ice Wand Demo', {
     modId: 'ice_wand_demo',
     packageName: 'com.blockforge.ice_wand_demo',
-    author: 'BlockForge'
+    author: 'BlockForge',
+    primaryLoader
   });
-  const item = createItem(project, 'ice_wand', '冰霜法杖');
-  item.properties.itemKind = 'magic_wand';
-  item.properties.maxStackSize = 1;
-  item.properties.durability = 128;
-  item.properties.tier = 'DIAMOND';
-  item.properties.attackDamage = 5;
-  item.properties.attackSpeed = -2.2;
-  item.properties.texture = 'ice_wand';
-  item.properties.model = 'ice_wand_model';
-  item.properties.rightClickLogic = 'item:ice_wand';
-  const block = createBlock(project, 'frost_block', '霜冻方块');
-  block.properties.textureAll = 'frost_block';
-  block.properties.model = 'frost_block_model';
-  const recipe = createRecipe(project, 'ice_wand', '冰霜法杖配方');
-  recipe.properties.ingredients = ['minecraft:stick', 'minecraft:snowball'];
-  recipe.properties.result = `${project.modId}:ice_wand`;
-  const loot = createLootTable(project, 'frost_block', '霜冻方块掉落');
-  loot.properties.targetBlock = 'frost_block';
-  loot.properties.drop = `${project.modId}:frost_block`;
-  const fn = createFunctionElement(project, 'ice_wand_cast', '冰霜法杖施法');
-  fn.properties.commands = 'effect give @p minecraft:slowness 3 1\nparticle minecraft:snowflake ~ ~1 ~ 0.6 0.8 0.6 0.02 40';
-  const effect = createMobEffect(project, 'frostbite', '霜寒状态');
-  effect.properties.category = 'harmful';
-  effect.properties.color = '#8fd8ff';
-  effect.properties.description = '降低目标速度的冰霜状态效果。';
-  const potion = createPotion(project, 'frost_potion', '霜寒药水');
-  potion.properties.effects = [{ effect: `${project.modId}:frostbite`, duration: 160, amplifier: 1, visible: true, showIcon: true }];
-  const enchantment = createEnchantment(project, 'frost_affinity', '霜寒亲和');
-  enchantment.properties.slots = ['mainhand'];
-  enchantment.properties.description = '让武器更适合触发冰霜主题逻辑。';
+  if (primaryLoader !== 'paper') {
+    const item = createItem(project, 'ice_wand', '冰霜法杖');
+    item.properties.itemKind = 'magic_wand';
+    item.properties.maxStackSize = 1;
+    item.properties.durability = 128;
+    item.properties.tier = 'DIAMOND';
+    item.properties.attackDamage = 5;
+    item.properties.attackSpeed = -2.2;
+    item.properties.texture = 'ice_wand';
+    item.properties.model = 'ice_wand_model';
+    item.properties.rightClickLogic = 'item:ice_wand';
+    const block = createBlock(project, 'frost_block', '霜冻方块');
+    block.properties.textureAll = 'frost_block';
+    block.properties.model = 'frost_block_model';
+    const recipe = createRecipe(project, 'ice_wand', '冰霜法杖配方');
+    recipe.properties.ingredients = ['minecraft:stick', 'minecraft:snowball'];
+    recipe.properties.result = `${project.modId}:ice_wand`;
+    const loot = createLootTable(project, 'frost_block', '霜冻方块掉落');
+    loot.properties.targetBlock = 'frost_block';
+    loot.properties.drop = `${project.modId}:frost_block`;
+    const fn = createFunctionElement(project, 'ice_wand_cast', '冰霜法杖施法');
+    fn.properties.commands = 'effect give @p minecraft:slowness 3 1\nparticle minecraft:snowflake ~ ~1 ~ 0.6 0.8 0.6 0.02 40';
+    const effect = createMobEffect(project, 'frostbite', '霜寒状态');
+    effect.properties.category = 'harmful';
+    effect.properties.color = '#8fd8ff';
+    effect.properties.description = '降低目标速度的冰霜状态效果。';
+    const potion = createPotion(project, 'frost_potion', '霜寒药水');
+    potion.properties.effects = [{ effect: `${project.modId}:frostbite`, duration: 160, amplifier: 1, visible: true, showIcon: true }];
+    const enchantment = createEnchantment(project, 'frost_affinity', '霜寒亲和');
+    enchantment.properties.slots = ['mainhand'];
+    enchantment.properties.description = '让武器更适合触发冰霜主题逻辑。';
 
-  for (const element of [item, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
+    for (const element of [item, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
 
-  const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'blockforge-sample-'));
-  const itemTexture = path.join(tmpDir, 'ice_wand.png');
-  const blockTexture = path.join(tmpDir, 'frost_block.png');
-  await fs.writeFile(itemTexture, sampleTexturePng);
-  await fs.writeFile(blockTexture, sampleTexturePng);
-  await importTexture(projectDir, itemTexture, 'item_texture', 'item:ice_wand', project.modId);
-  await importTexture(projectDir, blockTexture, 'block_texture', 'block:frost_block', project.modId);
-  await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:item/handheld', textures: { layer0: `${project.modId}:item/ice_wand` } }, null, 2), 'item_model', 'item:ice_wand', project.modId, 'ice_wand_model');
-  await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: `${project.modId}:block/frost_block` } }, null, 2), 'block_model', 'block:frost_block', project.modId, 'frost_block_model');
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'blockforge-sample-'));
+    const itemTexture = path.join(tmpDir, 'ice_wand.png');
+    const blockTexture = path.join(tmpDir, 'frost_block.png');
+    await fs.writeFile(itemTexture, sampleTexturePng);
+    await fs.writeFile(blockTexture, sampleTexturePng);
+    await importTexture(projectDir, itemTexture, 'item_texture', 'item:ice_wand', project.modId, project.primaryLoader);
+    await importTexture(projectDir, blockTexture, 'block_texture', 'block:frost_block', project.modId, project.primaryLoader);
+    await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:item/handheld', textures: { layer0: `${project.modId}:item/ice_wand` } }, null, 2), 'item_model', 'item:ice_wand', project.modId, 'ice_wand_model', project.primaryLoader);
+    await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: `${project.modId}:block/frost_block` } }, null, 2), 'block_model', 'block:frost_block', project.modId, 'frost_block_model', project.primaryLoader);
 
-  const graph = createDefaultLogicGraph('Ice wand right click', 'item:ice_wand');
-  await saveLogicGraph(projectDir, graph);
-  await saveUiScreen(projectDir, createDefaultUiScreen('Ice Wand GUI'));
+    const graph = createDefaultLogicGraph('Ice wand right click', 'item:ice_wand', project.primaryLoader);
+    await saveLogicGraph(projectDir, graph);
+    await saveUiScreen(projectDir, createDefaultUiScreen('Ice Wand GUI'));
+  }
+
   const elements = await loadElementSet(projectDir);
-  await generateForgeProject({ projectDir, project, ...elements, logicIR: [compileGraphToIR(graph)] });
+  const graphs = await loadLogicGraphs(projectDir);
+  const logicIR = graphs
+    .filter(graph => graph.enabled && !validateLogicGraph(graph).some(diagnostic => diagnostic.level === 'error'))
+    .map(compileGraphToIR);
+  await generateProjectArtifacts({ projectDir, project, ...elements, logicIR });
   await addRecentProject(projectDir);
   return { projectDir: path.resolve(projectDir), project };
 }
@@ -270,7 +279,7 @@ function registerIpc() {
     await addRecentProject(input.projectDir);
     return { projectDir: path.resolve(input.projectDir), project };
   });
-  ipcMain.handle('project:createSample', async (_event, input: { projectDir: string }) => createSampleProject(input.projectDir));
+  ipcMain.handle('project:createSample', async (_event, input: { projectDir: string; primaryLoader?: LoaderId }) => createSampleProject(input.projectDir, input.primaryLoader || 'forge'));
 
   ipcMain.handle('project:open', async (_event, input?: { projectDir?: string }) => {
     let projectDir = input?.projectDir;
@@ -326,15 +335,15 @@ function registerIpc() {
       if (picked.canceled || picked.filePaths.length === 0) return null;
       sourceFile = picked.filePaths[0];
     }
-    return importTexture(input.projectDir, sourceFile, input.usage, input.ownerElement, project.modId);
+    return importTexture(input.projectDir, sourceFile, input.usage, input.ownerElement, project.modId, project.primaryLoader);
   });
   ipcMain.handle('resources:saveTexture', async (_event, input: { projectDir: string; pngDataUrl: string; usage: 'item_texture' | 'block_texture'; ownerElement: string; textureName?: string }) => {
     const project = await readProject(input.projectDir);
-    return saveTextureDataUrl(input.projectDir, input.pngDataUrl, input.usage, input.ownerElement, project.modId, input.textureName);
+    return saveTextureDataUrl(input.projectDir, input.pngDataUrl, input.usage, input.ownerElement, project.modId, input.textureName, project.primaryLoader);
   });
   ipcMain.handle('resources:duplicate', async (_event, input: { projectDir: string; resourceId: string; newName?: string }) => {
     const project = await readProject(input.projectDir);
-    return duplicateResource(input.projectDir, input.resourceId, project.modId, input.newName);
+    return duplicateResource(input.projectDir, input.resourceId, project.modId, input.newName, project.primaryLoader);
   });
   ipcMain.handle('resources:delete', async (_event, input: { projectDir: string; resourceId: string }) => deleteResource(input.projectDir, input.resourceId));
   ipcMain.handle('resources:readIndex', async (_event, input: { projectDir: string }) => readResourceIndex(input.projectDir));
@@ -348,11 +357,11 @@ function registerIpc() {
       if (picked.canceled || picked.filePaths.length === 0) return null;
       sourceFile = picked.filePaths[0];
     }
-    return importModelJson(input.projectDir, sourceFile, input.usage, input.ownerElement, project.modId, input.modelName);
+    return importModelJson(input.projectDir, sourceFile, input.usage, input.ownerElement, project.modId, input.modelName, project.primaryLoader);
   });
   ipcMain.handle('resources:saveModel', async (_event, input: { projectDir: string; jsonText: string; usage: 'item_model' | 'block_model'; ownerElement: string; modelName?: string }) => {
     const project = await readProject(input.projectDir);
-    return saveModelJson(input.projectDir, input.jsonText, input.usage, input.ownerElement, project.modId, input.modelName);
+    return saveModelJson(input.projectDir, input.jsonText, input.usage, input.ownerElement, project.modId, input.modelName, project.primaryLoader);
   });
   ipcMain.handle('textureEditor:openWindow', async (_event, input: { projectDir: string }) => {
     openTextureEditorWindow(input.projectDir);
@@ -379,19 +388,23 @@ function registerIpc() {
     return file;
   });
 
-  ipcMain.handle('generate:forge', async (_event, input: { projectDir: string }) => {
+  async function generateCurrentProject(input: { projectDir: string }) {
     const project = await readProject(input.projectDir);
     const elements = await loadElementSet(input.projectDir);
     const graphs = await loadLogicGraphs(input.projectDir);
     const logicIR = graphs
       .filter(graph => graph.enabled && !validateLogicGraph(graph).some(diagnostic => diagnostic.level === 'error'))
       .map(compileGraphToIR);
-    const result = await generateForgeProject({ projectDir: input.projectDir, project, ...elements, logicIR });
+    const result = await generateProjectArtifacts({ projectDir: input.projectDir, project, ...elements, logicIR });
     const resourceDiagnostics = await checkResources(input.projectDir);
     return { ...result, resourceDiagnostics };
-  });
+  }
 
-  ipcMain.handle('build:forgeJar', async (event, input: { projectDir: string }) => buildForgeJar(input.projectDir, line => event.sender.send('build:log', line)));
+  ipcMain.handle('generate:project', async (_event, input: { projectDir: string }) => generateCurrentProject(input));
+  ipcMain.handle('generate:forge', async (_event, input: { projectDir: string }) => generateCurrentProject(input));
+
+  ipcMain.handle('build:projectJar', async (event, input: { projectDir: string }) => buildProjectJar(input.projectDir, line => event.sender.send('build:log', line)));
+  ipcMain.handle('build:forgeJar', async (event, input: { projectDir: string }) => buildProjectJar(input.projectDir, line => event.sender.send('build:log', line)));
 
   ipcMain.handle('logic:createDefault', async (_event, input: { boundElement?: string; name?: string }) => createDefaultLogicGraph(input.name, input.boundElement));
   ipcMain.handle('logic:createNode', async (_event, input: { nodeType: string }) => createNode(input.nodeType));

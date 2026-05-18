@@ -58,9 +58,11 @@ contextBridge.exposeInMainWorld('blockforge', {
     saveDraft: (payload: unknown) => invoke('modelEditor:saveDraft', payload)
   },
   generate: {
+    project: (payload: unknown) => invoke('generate:project', payload),
     forge: (payload: unknown) => invoke('generate:forge', payload)
   },
   build: {
+    projectJar: (payload: unknown) => invoke('build:projectJar', payload),
     forgeJar: (payload: unknown) => invoke('build:forgeJar', payload),
     onLog: (callback: (line: string) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, line: string) => callback(line);

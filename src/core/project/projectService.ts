@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createDefaultProject, type ProjectModel } from '../../shared/types/project';
+import { createDefaultProject, type LoaderId, type ProjectModel } from '../../shared/types/project';
 
 export function toModId(input: string): string {
   const normalized = input.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
@@ -36,6 +36,7 @@ export const projectDirs = [
   'editor/snapshots',
   'generated/forge',
   'generated/fabric',
+  'generated/paper',
   'generated/datapack',
   'generated/resourcepack',
   'src/custom',
@@ -48,6 +49,7 @@ export interface CreateProjectOptions {
   packageName?: string;
   author?: string;
   description?: string;
+  primaryLoader?: LoaderId;
 }
 
 export async function ensureProjectStructure(baseDir: string): Promise<void> {
@@ -58,7 +60,7 @@ export async function ensureProjectStructure(baseDir: string): Promise<void> {
 export async function createProject(baseDir: string, displayName: string, options: CreateProjectOptions = {}): Promise<ProjectModel> {
   const modId = options.modId?.trim() || toModId(displayName);
   if (!isValidModId(modId)) throw new Error(`无效的 mod id：${modId}`);
-  const project = createDefaultProject(displayName, modId);
+  const project = createDefaultProject(displayName, modId, options.primaryLoader || 'forge');
   project.packageName = options.packageName?.trim() || project.packageName;
   project.author = options.author?.trim() || project.author;
   project.description = options.description?.trim() || project.description;
@@ -71,7 +73,14 @@ export async function createProject(baseDir: string, displayName: string, option
 
 export async function readProject(projectDir: string): Promise<ProjectModel> {
   const raw = await fs.readFile(path.join(projectDir, 'blockforge.project.json'), 'utf8');
-  return JSON.parse(raw) as ProjectModel;
+  const parsed = JSON.parse(raw) as Partial<ProjectModel>;
+  const primaryLoader = parsed.primaryLoader || parsed.targetLoaders?.[0] || 'forge';
+  return {
+    ...createDefaultProject(parsed.displayName || 'BlockForge Project', parsed.modId || path.basename(projectDir), primaryLoader),
+    ...parsed,
+    targetLoaders: parsed.targetLoaders?.length ? parsed.targetLoaders : [primaryLoader],
+    primaryLoader
+  } as ProjectModel;
 }
 
 export async function writeProject(projectDir: string, project: ProjectModel): Promise<void> {

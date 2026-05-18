@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import type { ResourceIndex, ResourceItem } from '../../shared/types/resources';
 import type { Diagnostic } from '../../shared/types/elements';
+import type { LoaderId } from '../../shared/types/project';
 
 async function sha256(file: string): Promise<string> {
   const data = await fs.readFile(file);
@@ -72,8 +73,21 @@ function modelResourcePath(projectDir: string, usage: 'item_model' | 'block_mode
   return path.join(projectDir, 'editor/resources/models', modelKind(usage), `${name}.json`);
 }
 
-function modelGeneratedPath(modId: string, usage: 'item_model' | 'block_model', name: string): string {
-  return `generated/forge/src/main/resources/assets/${modId}/models/${modelKind(usage)}/${name}.json`;
+function generatedRoot(loader: LoaderId): LoaderId {
+  return loader;
+}
+
+function generatedResourceBase(loader: LoaderId, modId: string): string {
+  return `generated/${generatedRoot(loader)}/src/main/resources/assets/${modId}`;
+}
+
+function modelGeneratedPath(modId: string, usage: 'item_model' | 'block_model', name: string, loader: LoaderId): string {
+  return `${generatedResourceBase(loader, modId)}/models/${modelKind(usage)}/${name}.json`;
+}
+
+function textureGeneratedPath(modId: string, usage: 'item_texture' | 'block_texture', name: string, loader: LoaderId): string {
+  const kind = textureKind(usage);
+  return `${generatedResourceBase(loader, modId)}/textures/${kind}/${name}.png`;
 }
 
 function modelResourceId(usage: 'item_model' | 'block_model', name: string): string {
@@ -92,7 +106,7 @@ export async function writeResourceIndex(projectDir: string, index: ResourceInde
   await fs.writeFile(file, JSON.stringify(index, null, 2), 'utf8');
 }
 
-export async function importTexture(projectDir: string, sourceFile: string, usage: 'item_texture' | 'block_texture', ownerElement: string, modId: string): Promise<ResourceItem> {
+export async function importTexture(projectDir: string, sourceFile: string, usage: 'item_texture' | 'block_texture', ownerElement: string, modId: string, loader: LoaderId = 'forge'): Promise<ResourceItem> {
   const kind = textureKind(usage);
   const id = validateTextureName(textureIdFromOwner(ownerElement) || path.basename(sourceFile, path.extname(sourceFile)));
   const data = await fs.readFile(sourceFile);
@@ -103,7 +117,7 @@ export async function importTexture(projectDir: string, sourceFile: string, usag
   const resource: ResourceItem = {
     resourceId: `texture_${kind}_${id}`,
     path: path.relative(projectDir, dest).replace(/\\/g, '/'),
-    generatedPath: `generated/forge/src/main/resources/assets/${modId}/textures/${kind}/${id}.png`,
+    generatedPath: textureGeneratedPath(modId, usage, id, loader),
     type: 'texture',
     usage,
     ownerElement,
@@ -128,7 +142,8 @@ export async function saveTextureDataUrl(
   usage: 'item_texture' | 'block_texture',
   ownerElement: string,
   modId: string,
-  textureName?: string
+  textureName?: string,
+  loader: LoaderId = 'forge'
 ): Promise<ResourceItem> {
   const kind = textureKind(usage);
   const id = validateTextureName(textureName || textureIdFromOwner(ownerElement));
@@ -140,7 +155,7 @@ export async function saveTextureDataUrl(
   const resource: ResourceItem = {
     resourceId: `texture_${kind}_${id}`,
     path: path.relative(projectDir, dest).replace(/\\/g, '/'),
-    generatedPath: `generated/forge/src/main/resources/assets/${modId}/textures/${kind}/${id}.png`,
+    generatedPath: textureGeneratedPath(modId, usage, id, loader),
     type: 'texture',
     usage,
     ownerElement,
@@ -165,11 +180,12 @@ export async function importModelJson(
   usage: 'item_model' | 'block_model',
   ownerElement: string,
   modId: string,
-  modelName?: string
+  modelName?: string,
+  loader: LoaderId = 'forge'
 ): Promise<ResourceItem> {
   const raw = await fs.readFile(sourceFile, 'utf8');
   const parsed = JSON.parse(raw);
-  return saveModelJson(projectDir, JSON.stringify(parsed, null, 2), usage, ownerElement, modId, modelName || path.basename(sourceFile, path.extname(sourceFile)));
+  return saveModelJson(projectDir, JSON.stringify(parsed, null, 2), usage, ownerElement, modId, modelName || path.basename(sourceFile, path.extname(sourceFile)), loader);
 }
 
 export async function saveModelJson(
@@ -178,7 +194,8 @@ export async function saveModelJson(
   usage: 'item_model' | 'block_model',
   ownerElement: string,
   modId: string,
-  modelName?: string
+  modelName?: string,
+  loader: LoaderId = 'forge'
 ): Promise<ResourceItem> {
   const name = validateModelName(modelName || textureIdFromOwner(ownerElement) || 'model');
   const parsed = JSON.parse(jsonText);
@@ -189,7 +206,7 @@ export async function saveModelJson(
   const resource: ResourceItem = {
     resourceId: modelResourceId(usage, name),
     path: path.relative(projectDir, dest).replace(/\\/g, '/'),
-    generatedPath: modelGeneratedPath(modId, usage, name),
+    generatedPath: modelGeneratedPath(modId, usage, name, loader),
     type: 'model',
     usage,
     ownerElement: ownerElement || undefined,
@@ -225,7 +242,7 @@ function nextCopyName(existing: Set<string>, baseName: string): string {
   return candidate;
 }
 
-export async function duplicateResource(projectDir: string, resourceId: string, modId: string, newName?: string): Promise<ResourceItem> {
+export async function duplicateResource(projectDir: string, resourceId: string, modId: string, newName?: string, loader: LoaderId = 'forge'): Promise<ResourceItem> {
   const index = await readResourceIndex(projectDir);
   const sourceResource = index.resources.find(resource => resource.resourceId === resourceId);
   if (!sourceResource) throw new Error(`没有找到资源：${resourceId}`);
@@ -248,7 +265,7 @@ export async function duplicateResource(projectDir: string, resourceId: string, 
     await fs.mkdir(path.dirname(dest), { recursive: true });
     const content = `${JSON.stringify(data, null, 2)}\n`;
     await fs.writeFile(dest, content, 'utf8');
-    generatedPath = modelGeneratedPath(modId, modelUsage, id);
+    generatedPath = modelGeneratedPath(modId, modelUsage, id, loader);
     hash = sha256Buffer(Buffer.from(content, 'utf8'));
   } else {
     const data = await fs.readFile(source);
@@ -256,7 +273,7 @@ export async function duplicateResource(projectDir: string, resourceId: string, 
     dest = path.join(projectDir, 'editor/resources/textures', kind, `${id}.png`);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, data);
-    generatedPath = `generated/forge/src/main/resources/assets/${modId}/textures/${kind}/${id}.png`;
+    generatedPath = textureGeneratedPath(modId, textureUsage, id, loader);
     hash = sha256Buffer(data);
   }
   const resource: ResourceItem = {
@@ -293,7 +310,7 @@ export async function deleteResource(projectDir: string, resourceId: string): Pr
   return index;
 }
 
-export async function copyResourcesToForge(projectDir: string, modId: string): Promise<ResourceItem[]> {
+export async function copyResourcesToGenerated(projectDir: string, modId: string, loader: LoaderId = 'forge'): Promise<ResourceItem[]> {
   const index = await readResourceIndex(projectDir);
   const copied: ResourceItem[] = [];
   for (const resource of index.resources) {
@@ -306,7 +323,7 @@ export async function copyResourcesToForge(projectDir: string, modId: string): P
       ? modelKind(modelUsage)
       : textureUsage === 'block_texture' ? 'block' : 'item';
     const root = isModel ? 'models' : 'textures';
-    const target = path.join(projectDir, 'generated/forge/src/main/resources/assets', modId, root, folder, path.basename(resource.path));
+    const target = path.join(projectDir, `generated/${generatedRoot(loader)}/src/main/resources/assets`, modId, root, folder, path.basename(resource.path));
     try {
       await fs.mkdir(path.dirname(target), { recursive: true });
       await fs.copyFile(source, target);
@@ -320,6 +337,8 @@ export async function copyResourcesToForge(projectDir: string, modId: string): P
   await writeResourceIndex(projectDir, index);
   return copied;
 }
+
+export const copyResourcesToForge = copyResourcesToGenerated;
 
 export async function checkResources(projectDir: string): Promise<Diagnostic[]> {
   const index = await readResourceIndex(projectDir);

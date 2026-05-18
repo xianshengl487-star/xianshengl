@@ -25,7 +25,7 @@ function baseElement(project: ProjectModel, id: string, zhName: string) {
     tags: [],
     enabled: true,
     experimental: false,
-    targetLoaders: ['forge' as const],
+    targetLoaders: [project.primaryLoader],
     mcVersions: ['1.20.1'],
     linkedResources: [],
     linkedLogic: [],

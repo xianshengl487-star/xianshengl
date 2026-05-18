@@ -41,6 +41,8 @@ function shouldSkip(rootDir: string, filePath: string) {
   const normalized = normalizePath(filePath);
   return [
     '/generated/forge/',
+    '/generated/fabric/',
+    '/generated/paper/',
     '/exports/',
     '/logs/',
     '/editor/snapshots/'

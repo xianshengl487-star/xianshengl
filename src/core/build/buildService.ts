@@ -6,6 +6,8 @@ import https from 'node:https';
 import os from 'node:os';
 import path from 'node:path';
 import { createSnapshot } from '../snapshot/snapshotService';
+import { readProject } from '../project/projectService';
+import { loaderOutputFolder, loaderShortName, type LoaderId } from '../../shared/types/project';
 
 const BUNDLED_GRADLE_VERSION = '8.14.4';
 const GRADLE_DISTRIBUTION_URLS = [
@@ -346,4 +348,89 @@ export async function buildForgeJar(projectDir: string, onLog?: (line: string) =
       ? 'Gradle 已结束，但 build/libs 中没有找到 jar。'
       : 'Gradle 构建失败。请查看已保存的日志。';
   return { success, logFile, jarFiles, copiedToExports, javaOk, gradleCommand: gradle.command, message };
+}
+
+function generatedRootForLoader(loader: LoaderId): string {
+  return path.join('generated', loaderOutputFolder(loader));
+}
+
+async function buildGeneratedProjectJar(
+  projectDir: string,
+  loader: LoaderId,
+  onLog?: (line: string) => void
+): Promise<BuildResult> {
+  const logsDir = path.join(projectDir, 'logs');
+  await fs.mkdir(logsDir, { recursive: true });
+  const logFile = path.join(logsDir, `build_${loader}_${Date.now()}.log`);
+  let log = '';
+  const capture = (line: string) => { log += line; onLog?.(line); };
+  const projectRoot = path.join(projectDir, generatedRootForLoader(loader));
+
+  try {
+    await createSnapshot(projectDir, `before_build_${loader}`);
+    capture('构建前快照已创建。\n');
+  } catch (error) {
+    capture(`创建构建前快照失败：${error instanceof Error ? error.message : String(error)}\n`);
+  }
+
+  if (!(await exists(path.join(projectRoot, 'build.gradle')))) {
+    const label = loaderShortName(loader);
+    const message = `还没有生成 ${label} 工程。请先执行“生成工程”。`;
+    capture(`${message}\n`);
+    await fs.writeFile(logFile, log, 'utf8');
+    return { success: false, logFile, jarFiles: [], copiedToExports: [], javaOk: false, gradleCommand: '', message };
+  }
+
+  capture('正在检查 Java 17...\n');
+  const java = await checkJava17(projectDir, capture);
+  const javaOk = java.ok;
+  if (!javaOk) {
+    const message = '未检测到 JDK 17。请安装并配置 JDK 17 后再次构建。';
+    capture(`${message}\n`);
+    await fs.writeFile(logFile, log, 'utf8');
+    return { success: false, logFile, jarFiles: [], copiedToExports: [], javaOk, gradleCommand: '', message };
+  }
+  if (java.major && java.major !== 17) {
+    capture(`检测到 Java ${java.major}。${loaderShortName(loader)} 1.20.1 推荐使用 Java 17；如果构建失败，请安装 JDK 17 并把它放到 PATH 最前面。\n`);
+  }
+
+  const gradle = await findGradleCommand(projectRoot, capture);
+  capture(`正在运行 ${gradle.label}：${gradle.command} ${gradle.args.join(' ')}\n`);
+  const result = await run(gradle.command, gradle.args, projectRoot, capture, true);
+  const libsDir = path.join(projectRoot, 'build/libs');
+  let jarFiles: string[] = [];
+  try { jarFiles = (await fs.readdir(libsDir)).filter(f => f.endsWith('.jar')).map(f => path.join(libsDir, f)); } catch {}
+
+  const exportsDir = path.join(projectDir, 'exports');
+  await fs.mkdir(exportsDir, { recursive: true });
+  const copiedToExports: string[] = [];
+  for (const jar of jarFiles) {
+    const target = path.join(exportsDir, path.basename(jar));
+    await fs.copyFile(jar, target);
+    copiedToExports.push(target);
+  }
+  await fs.writeFile(logFile, log, 'utf8');
+
+  const success = result.code === 0 && jarFiles.length > 0;
+  const message = success
+    ? `构建成功。已复制 ${copiedToExports.length} 个 jar 到 exports。`
+    : result.code === 0
+      ? 'Gradle 已结束，但 build/libs 中没有找到 jar。'
+      : 'Gradle 构建失败。请查看已保存的日志。';
+  return { success, logFile, jarFiles, copiedToExports, javaOk, gradleCommand: gradle.command, message };
+}
+
+export async function buildFabricJar(projectDir: string, onLog?: (line: string) => void): Promise<BuildResult> {
+  return buildGeneratedProjectJar(projectDir, 'fabric', onLog);
+}
+
+export async function buildPaperJar(projectDir: string, onLog?: (line: string) => void): Promise<BuildResult> {
+  return buildGeneratedProjectJar(projectDir, 'paper', onLog);
+}
+
+export async function buildProjectJar(projectDir: string, onLog?: (line: string) => void): Promise<BuildResult> {
+  const project = await readProject(projectDir);
+  if (project.primaryLoader === 'fabric') return buildFabricJar(projectDir, onLog);
+  if (project.primaryLoader === 'paper') return buildPaperJar(projectDir, onLog);
+  return buildForgeJar(projectDir, onLog);
 }

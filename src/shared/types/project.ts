@@ -1,4 +1,28 @@
-export type LoaderId = 'forge' | 'fabric';
+export type LoaderId = 'forge' | 'fabric' | 'paper';
+
+export function loaderShortName(loader: LoaderId): string {
+  if (loader === 'fabric') return 'Fabric';
+  if (loader === 'paper') return 'Paper';
+  return 'Forge';
+}
+
+export function loaderDisplayName(loader: LoaderId): string {
+  if (loader === 'fabric') return 'Fabric 模组';
+  if (loader === 'paper') return 'Paper 插件';
+  return 'Forge 模组';
+}
+
+export function loaderOutputFolder(loader: LoaderId): LoaderId {
+  return loader;
+}
+
+export function loaderDeployFolder(loader: LoaderId): 'mods' | 'plugins' {
+  return loader === 'paper' ? 'plugins' : 'mods';
+}
+
+export function isPluginLoader(loader: LoaderId): loader is 'paper' {
+  return loader === 'paper';
+}
 
 export interface ProjectModel {
   schemaVersion: string;
@@ -30,7 +54,7 @@ export interface ProjectModel {
   };
 }
 
-export function createDefaultProject(displayName: string, modId: string): ProjectModel {
+export function createDefaultProject(displayName: string, modId: string, primaryLoader: LoaderId = 'forge'): ProjectModel {
   const now = new Date().toISOString();
   return {
     schemaVersion: '0.1.0',
@@ -43,8 +67,8 @@ export function createDefaultProject(displayName: string, modId: string): Projec
     description: 'A visual Minecraft mod project created by BlockForge Studio.',
     minecraftVersion: '1.20.1',
     javaVersion: '17',
-    targetLoaders: ['forge'],
-    primaryLoader: 'forge',
+    targetLoaders: [primaryLoader],
+    primaryLoader,
     license: 'All Rights Reserved',
     createdAt: now,
     updatedAt: now,

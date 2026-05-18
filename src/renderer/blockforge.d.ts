@@ -12,6 +12,8 @@ type SnapshotInfo = {
   reason: string;
 };
 
+type LoaderId = 'forge' | 'fabric' | 'paper';
+
 type InstalledTemplate = {
   manifest: {
     id: string;
@@ -91,8 +93,8 @@ declare global {
     blockforge?: {
       version: string;
       project: {
-        create(payload: { projectDir: string; displayName: string; modId?: string; packageName?: string; author?: string; description?: string }): Promise<ProjectOpenResult>;
-        createSample(payload: { projectDir: string }): Promise<ProjectOpenResult>;
+        create(payload: { projectDir: string; displayName: string; modId?: string; packageName?: string; author?: string; description?: string; primaryLoader?: LoaderId }): Promise<ProjectOpenResult>;
+        createSample(payload: { projectDir: string; primaryLoader?: LoaderId }): Promise<ProjectOpenResult>;
         open(payload?: { projectDir?: string }): Promise<ProjectOpenResult>;
         readRecent(): Promise<string[]>;
         exportZip(payload: { projectDir: string; outputFile?: string }): Promise<string>;
@@ -140,9 +142,11 @@ declare global {
         saveDraft(payload: { projectDir: string; draft: ModelEditorDraft }): Promise<string>;
       };
       generate: {
-        forge(payload: { projectDir: string }): Promise<{ root: string; copiedResources: number; resourceDiagnostics: Diagnostic[] }>;
+        project(payload: { projectDir: string }): Promise<{ root: string; copiedResources: number; preview: string; resourceDiagnostics: Diagnostic[] }>;
+        forge(payload: { projectDir: string }): Promise<{ root: string; copiedResources: number; preview: string; resourceDiagnostics: Diagnostic[] }>;
       };
       build: {
+        projectJar(payload: { projectDir: string }): Promise<unknown>;
         forgeJar(payload: { projectDir: string }): Promise<unknown>;
         onLog(callback: (line: string) => void): () => void;
       };
