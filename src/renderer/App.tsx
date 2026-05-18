@@ -51,11 +51,18 @@ type AppSettings = {
   autoBuildAfterGenerate: boolean;
   backgroundColor: string;
   uiDensity: UiDensity;
+  panelVisibility: PanelVisibility;
   aiPermissions: AiPermissions;
   completedProjects: CompletedProject[];
 };
 
 type UiDensity = 'comfortable' | 'compact';
+
+type PanelVisibility = {
+  leftSidebar: boolean;
+  rightSidebar: boolean;
+  bottomPanel: boolean;
+};
 
 type AiPermissions = {
   chat: boolean;
@@ -220,7 +227,13 @@ const defaultAiPermissions: AiPermissions = {
   applyProjectPlan: false
 };
 
-const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', uiDensity: 'comfortable', aiPermissions: defaultAiPermissions, completedProjects: [] };
+const defaultPanelVisibility: PanelVisibility = {
+  leftSidebar: true,
+  rightSidebar: true,
+  bottomPanel: true
+};
+
+const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgroundColor: '#ffffff', uiDensity: 'comfortable', panelVisibility: defaultPanelVisibility, aiPermissions: defaultAiPermissions, completedProjects: [] };
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
@@ -360,6 +373,7 @@ function normalizeSettings(settings: Partial<AppSettings>): AppSettings {
     ...defaultAppSettings,
     ...settings,
     uiDensity: settings.uiDensity === 'compact' ? 'compact' : 'comfortable',
+    panelVisibility: { ...defaultPanelVisibility, ...(settings.panelVisibility || {}) },
     aiPermissions: { ...defaultAiPermissions, ...(settings.aiPermissions || {}) },
     completedProjects: Array.isArray(settings.completedProjects) ? settings.completedProjects : []
   };
@@ -2047,7 +2061,7 @@ export default function App() {
   };
 
   return (
-    <div className={`app-shell density-${appSettings.uiDensity} ${textureEditorMode ? 'texture-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
+    <div className={`app-shell density-${appSettings.uiDensity} ${appSettings.panelVisibility.leftSidebar ? '' : 'no-left-sidebar'} ${appSettings.panelVisibility.rightSidebar ? '' : 'no-right-sidebar'} ${appSettings.panelVisibility.bottomPanel ? '' : 'no-bottom-panel'} ${textureEditorMode ? 'texture-editor-mode' : ''}`} style={{ '--app-background-color': appSettings.backgroundColor } as CSSProperties}>
       <header className="topbar">
         <div className="brand">
           <strong>BlockForge Studio</strong>
@@ -2934,6 +2948,32 @@ export default function App() {
                   </button>
                 </div>
                 <div className="hint">舒展模式更适合长时间编辑；紧凑模式会缩小面板、间距和顶部区域，适合同时看更多节点、属性和日志。</div>
+              </Panel>
+              <Panel title="面板显隐">
+                <div className="button-row wrap">
+                  <button
+                    className={appSettings.panelVisibility.leftSidebar ? 'selected' : ''}
+                    onClick={() => void updateAppSettings({ panelVisibility: { ...appSettings.panelVisibility, leftSidebar: !appSettings.panelVisibility.leftSidebar } })}
+                    disabled={!canUseBridge || Boolean(busy)}
+                  >
+                    左侧资源栏
+                  </button>
+                  <button
+                    className={appSettings.panelVisibility.rightSidebar ? 'selected' : ''}
+                    onClick={() => void updateAppSettings({ panelVisibility: { ...appSettings.panelVisibility, rightSidebar: !appSettings.panelVisibility.rightSidebar } })}
+                    disabled={!canUseBridge || Boolean(busy)}
+                  >
+                    右侧属性栏
+                  </button>
+                  <button
+                    className={appSettings.panelVisibility.bottomPanel ? 'selected' : ''}
+                    onClick={() => void updateAppSettings({ panelVisibility: { ...appSettings.panelVisibility, bottomPanel: !appSettings.panelVisibility.bottomPanel } })}
+                    disabled={!canUseBridge || Boolean(busy)}
+                  >
+                    底部日志栏
+                  </button>
+                </div>
+                <div className="hint">可按当前任务把不需要的面板先收起来；如果你在做节点或贴图，通常会更舒服一些。</div>
               </Panel>
               <Panel title="部署环境">
                 <div className="hint">生成 Forge 工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>

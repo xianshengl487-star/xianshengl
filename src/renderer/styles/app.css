@@ -211,6 +211,18 @@ label {
   min-height: 0;
 }
 
+.app-shell.no-left-sidebar .workspace {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+.app-shell.no-right-sidebar .workspace {
+  grid-template-columns: 260px minmax(0, 1fr);
+}
+
+.app-shell.no-left-sidebar.no-right-sidebar .workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar,
 .rightbar {
   min-height: 0;
@@ -225,6 +237,11 @@ label {
 
 .rightbar {
   border-left: 1px solid var(--border-color);
+}
+
+.app-shell.no-left-sidebar .sidebar,
+.app-shell.no-right-sidebar .rightbar {
+  display: none;
 }
 
 .editor-area {
@@ -1372,6 +1389,14 @@ label {
   min-height: 0;
   border-top: 1px solid var(--border-color);
   background: #f8fafc;
+}
+
+.app-shell.no-bottom-panel {
+  grid-template-rows: var(--shell-topbar-height) minmax(0, 1fr);
+}
+
+.app-shell.no-bottom-panel .bottom-panel {
+  display: none;
 }
 
 .bottom-tabs {
