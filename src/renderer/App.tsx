@@ -281,14 +281,22 @@ function defaultTargetHandle(node: LogicNode) {
 }
 
 function coerceParamValue(current: unknown, next: string) {
+  const trimmed = next.trim();
+  if (/^var:[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed) || /^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/.test(trimmed)) return trimmed;
   if (typeof current === 'number') {
-    const trimmed = next.trim();
-    if (/^var:[a-zA-Z_][a-zA-Z0-9_]*$/.test(trimmed) || /^\$\{[a-zA-Z_][a-zA-Z0-9_]*\}$/.test(trimmed)) return trimmed;
     const number = Number(next);
     return Number.isFinite(number) ? number : next;
   }
   if (typeof current === 'boolean') return next === 'true';
   return next;
+}
+
+function formatVariableReferenceForParam(key: string, current: unknown, variableId: string) {
+  const id = variableId.trim().replace(/[^a-zA-Z0-9_]/g, '_');
+  if (!id) return '';
+  if (key === 'variable') return id;
+  if (typeof current === 'number' || typeof current === 'boolean') return `var:${id}`;
+  return '${' + id + '}';
 }
 
 function itemKindDefaults(kind: ItemKind): Record<string, unknown> {
@@ -2714,6 +2722,29 @@ export default function App() {
 
           {activeView === 'settings' && (
             <section className="view-grid settings-grid">
+              <Panel title="软件介绍">
+                <div className="list-panel">
+                  <div className="list-row">
+                    <div>
+                      <strong>BlockForge Studio 是一个类似 VS Code 的 Minecraft Forge 模组编辑器。</strong>
+                      <span>它把项目、元素、贴图、节点逻辑、NBT、界面草图、Forge 生成、构建日志和 AI 辅助集中在一个桌面工作台里。</span>
+                    </div>
+                  </div>
+                  <div className="list-row">
+                    <div>
+                      <strong>适合的制作流程</strong>
+                      <span>先做物品/方块，再绑定贴图，然后用节点把事件、条件、变量、NBT 和动作串起来，最后生成 Forge 工程并构建 jar。</span>
+                    </div>
+                  </div>
+                  <div className="list-row">
+                    <div>
+                      <strong>当前重点能力</strong>
+                      <span>Forge 1.20.1、中文化属性编辑、内置像素绘制器、右键资源管理、节点变量引用、AI 草案校验和构建前快照。</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="hint">推荐顺序：项目 → 元素 → 资源 → 节点逻辑 → Forge 生成 → 构建/导出。任何生成和 AI 大改动前都会尽量保留快照，方便回退。</div>
+              </Panel>
               <Panel title="使用教程">
                 <div className="tutorial-list">
                   <TutorialStep
@@ -2740,7 +2771,7 @@ export default function App() {
                   <TutorialStep
                     number="4"
                     title="编辑节点逻辑"
-                    text="在“节点逻辑”页添加事件、条件、动作、变量和 NBT 节点。变量可写成 ${counter} 或 var:counter，保存后可预览 Forge 代码。"
+                    text="在“节点逻辑”页添加事件、条件、动作、变量和 NBT 节点。先在变量面板创建变量，再右键任意节点参数输入框即可插入变量；文本参数会写成 ${counter}，数字/布尔参数会写成 var:counter。"
                     actionLabel="去编辑节点"
                     onAction={() => setActiveView('logic')}
                   />
@@ -2750,6 +2781,13 @@ export default function App() {
                     text="在“Forge 生成”页先生成工程，再构建 jar。构建成功后，jar 会复制到项目 exports 目录。"
                     actionLabel="去生成构建"
                     onAction={() => setActiveView('forge')}
+                  />
+                  <TutorialStep
+                    number="6"
+                    title="使用 AI 但保留控制权"
+                    text="在“AI 助手”页可以配置本地 Ollama、LM Studio 或 OpenAI-compatible 服务。AI 草案不会直接写 Java；应用前会先校验节点图或展示工程变更计划。"
+                    actionLabel="打开 AI 助手"
+                    onAction={() => setActiveView('ai')}
                   />
                 </div>
                 <div className="button-row wrap">
@@ -3215,6 +3253,19 @@ function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: Log
   const updateParam = (key: string, value: string) => onChange({
     params: { ...node.params, [key]: coerceParamValue(node.params[key], value) }
   });
+  const insertVariable = (key: string, current: unknown) => {
+    const variableList = variables.map(variable => `${variable.name} (${variable.id})`).join('\n');
+    const input = window.prompt(
+      variableList
+        ? `输入变量 ID 或变量名。\n\n可用变量：\n${variableList}`
+        : '当前还没有变量，先输入一个变量 ID 也可以。',
+      variables[0]?.id || ''
+    );
+    if (!input) return;
+    const trimmed = input.trim();
+    const matched = variables.find(variable => variable.id === trimmed || variable.name === trimmed);
+    updateParam(key, formatVariableReferenceForParam(key, current, matched?.id || trimmed));
+  };
   return (
     <div className="node-inspector">
       <div>
@@ -3225,7 +3276,7 @@ function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: Log
       <Field label="备注" value={node.comment || ''} onChange={value => onChange({ comment: value })} />
       <div className="node-param-grid">
         {Object.entries(node.params).map(([key, value]) => (
-          <label key={key}>
+          <label key={key} onContextMenu={event => { event.preventDefault(); insertVariable(key, value); }} title="右键插入变量">
             <span>{key}</span>
             {key === 'variable' ? (
               <select value={String(value || '')} onChange={event => updateParam(key, event.target.value)}>
@@ -3248,6 +3299,7 @@ function LogicNodeInspector({ node, variables, onChange, onDelete }: { node: Log
         ))}
         {Object.keys(node.params).length === 0 && <span className="tree-empty">这个节点没有可编辑参数。</span>}
       </div>
+      <div className="hint">右键参数输入框可以直接插入变量；数字和文本参数会自动转成可识别的变量引用。</div>
       <button onClick={onDelete}>删除节点</button>
     </div>
   );
