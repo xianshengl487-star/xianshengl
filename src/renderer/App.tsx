@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../shared/types/ai';
-import type { AiChatMessage, AiProjectChangePlan, AiProviderConfig } from '../shared/types/ai';
+import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../shared/types/ai';
 import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
 import type { ProjectModel } from '../shared/types/project';
@@ -72,6 +72,9 @@ type AiPermissions = {
   chat: boolean;
   readProjectContext: boolean;
   logicDraft: boolean;
+  textureDraft: boolean;
+  modelDraft: boolean;
+  featureRecipe: boolean;
   projectPlan: boolean;
   applyProjectPlan: boolean;
 };
@@ -287,6 +290,9 @@ const defaultAiPermissions: AiPermissions = {
   chat: true,
   readProjectContext: true,
   logicDraft: true,
+  textureDraft: true,
+  modelDraft: true,
+  featureRecipe: true,
   projectPlan: false,
   applyProjectPlan: false
 };
@@ -301,6 +307,21 @@ const defaultAppSettings: AppSettings = { autoBuildAfterGenerate: false, backgro
 
 function pretty(value: unknown) {
   return JSON.stringify(value, null, 2);
+}
+
+function previewTextureDraft(draft: AiTextureDraft) {
+  return pretty({
+    ...draft,
+    pixels: `${draft.pixels.length} pixels`,
+    previewPixels: draft.pixels.slice(0, 64)
+  });
+}
+
+function previewModelDraft(draft: AiModelDraft) {
+  return pretty({
+    ...draft,
+    modelJson: draft.modelJson.length > 1600 ? `${draft.modelJson.slice(0, 1600)}\n...` : draft.modelJson
+  });
 }
 
 function shortPath(value: string, maxLength = 58) {
@@ -613,6 +634,12 @@ export default function App() {
     compatibleMode: 'openai'
   });
   const [aiPrompt, setAiPrompt] = useState('右键冰霜法杖，消耗10级经验，执行冰冻效果命令，然后进入5秒冷却。');
+  const [aiTexturePrompt, setAiTexturePrompt] = useState('画一个 16x16 的 Minecraft 冰霜法杖物品贴图，深蓝木柄、浅蓝晶体、雪花高光，适合物品栏显示。');
+  const [aiTextureDraft, setAiTextureDraft] = useState<AiTextureDraft | null>(null);
+  const [aiModelPrompt, setAiModelPrompt] = useState('生成一个可在 Blockbench 打开的冰霜法杖 3D 物品模型，细长手柄、顶部蓝色晶体，符合 Forge 1.20.1。');
+  const [aiModelDraft, setAiModelDraft] = useState<AiModelDraft | null>(null);
+  const [aiFeaturePrompt, setAiFeaturePrompt] = useState('设计一个会动起来的魔法方块：周期性发光、粒子、音效、右键切换状态，并给出材质、动画、节点逻辑和 Forge 制作路线。');
+  const [aiFeatureDraft, setAiFeatureDraft] = useState<AiModFeatureDraft | null>(null);
   const commandHandlers = useRef<Record<string, () => void>>({});
   const autoOpenedTextureProject = useRef(false);
 
@@ -1272,6 +1299,64 @@ export default function App() {
     await api.textureEditor.saveDraft({ projectDir, draft: textureDraft() });
   }
 
+  function applyAiTextureDraft(draft: AiTextureDraft) {
+    const firstColor = draft.palette.find(color => color !== 'transparent')
+      || draft.pixels.find(color => color !== 'transparent')
+      || textureColor;
+    setAiTextureDraft(draft);
+    setTextureName(draft.textureName);
+    setTextureUsage(draft.textureUsage);
+    setTextureOwner(draft.textureOwner);
+    setTextureSize(draft.size);
+    setTexturePixels(draft.pixels);
+    setTextureColor(firstColor);
+    setTextureTool('pencil');
+    setTextureDraftLoaded(true);
+    return firstColor;
+  }
+
+  async function createAiTextureDraft() {
+    await runAction('AI 绘制材质草稿', async () => {
+      if (!api || !project) return;
+      if (!appSettings.aiPermissions.textureDraft) {
+        reportError('AI 绘制材质草稿', new Error('当前已关闭 AI 材质草稿权限。'));
+        return;
+      }
+      const draft = await api.ai.createTextureDraft({
+        config: aiConfig,
+        prompt: aiTexturePrompt,
+        context: {
+          ...aiProjectContext(),
+          modId: project.modId,
+          textureName,
+          textureUsage,
+          textureOwner,
+          textureSize,
+          currentElement: draftElement ? `${draftElement.type}:${draftElement.id}` : textureOwner,
+          availableElements: allElements.map(element => `${element.type}:${element.id}`)
+        }
+      });
+      const firstColor = applyAiTextureDraft(draft);
+      await api.textureEditor.saveDraft({
+        projectDir,
+        draft: {
+          textureName: draft.textureName,
+          textureUsage: draft.textureUsage,
+          textureOwner: draft.textureOwner,
+          textureSize: draft.size,
+          textureColor: firstColor,
+          textureTool: 'pencil',
+          texturePixels: draft.pixels,
+          texturePixelScale
+        }
+      });
+      setAiOutput(pretty(draft));
+      setActiveView('resources');
+      setBottomTab('ai');
+      pushLog(`AI 已绘制材质草稿：${draft.textureName}。确认满意后点击“保存绘制贴图并绑定”。`);
+    });
+  }
+
   async function openTextureEditorWindow() {
     await runAction('打开独立贴图窗口', async () => {
       if (!api || !project) return;
@@ -1351,6 +1436,58 @@ export default function App() {
   async function persistModelDraft() {
     if (!api || !project) return;
     await api.modelEditor.saveDraft({ projectDir, draft: modelDraft() });
+  }
+
+  function applyAiModelDraft(draft: AiModelDraft) {
+    setAiModelDraft(draft);
+    setModelName(draft.modelName);
+    setModelUsage(draft.modelUsage);
+    setModelOwner(draft.modelOwner);
+    setModelJson(draft.modelJson);
+    setModelDraftLoaded(true);
+  }
+
+  async function createAiModelDraft() {
+    await runAction('AI 生成模型草稿', async () => {
+      if (!api || !project) return;
+      if (!appSettings.aiPermissions.modelDraft) {
+        reportError('AI 生成模型草稿', new Error('当前已关闭 AI 模型草稿权限。'));
+        return;
+      }
+      const draft = await api.ai.createModelDraft({
+        config: aiConfig,
+        prompt: aiModelPrompt,
+        context: {
+          ...aiProjectContext(),
+          modId: project.modId,
+          textureName,
+          textureUsage,
+          modelName,
+          modelUsage,
+          modelOwner,
+          availableResources: resources.resources.map(resource => ({
+            type: resource.type,
+            path: resource.path,
+            usage: resource.usage,
+            ownerElement: resource.ownerElement
+          }))
+        }
+      });
+      applyAiModelDraft(draft);
+      await api.modelEditor.saveDraft({
+        projectDir,
+        draft: {
+          modelName: draft.modelName,
+          modelUsage: draft.modelUsage,
+          modelOwner: draft.modelOwner,
+          modelJson: draft.modelJson
+        }
+      });
+      setAiOutput(pretty(draft));
+      setActiveView('resources');
+      setBottomTab('ai');
+      pushLog(`AI 已生成模型草稿：${draft.modelName}。可直接在 Blockbench/模型编辑器里继续修整。`);
+    });
   }
 
   function defaultModelJson() {
@@ -2348,6 +2485,66 @@ export default function App() {
     });
   }
 
+  async function createAiFeatureRecipe() {
+    await runAction('生成 AI 特色玩法方案', async () => {
+      if (!api || !project) return;
+      if (!appSettings.aiPermissions.featureRecipe) {
+        reportError('生成 AI 特色玩法方案', new Error('当前已关闭 AI 特色玩法方案权限。'));
+        return;
+      }
+      const draft = await api.ai.createFeatureRecipe({
+        config: aiConfig,
+        prompt: aiFeaturePrompt,
+        context: {
+          ...aiProjectContext(),
+          project,
+          selectedElement: draftElement ? `${draftElement.type}:${draftElement.id}` : null,
+          selectedTexture: { textureName, textureUsage, textureOwner },
+          selectedModel: { modelName, modelUsage, modelOwner },
+          existingLogicGraphs: graphs.map(graph => ({ name: graph.name, eventType: graph.eventType, boundElement: graph.boundElement })),
+          featureTargets: ['animated_block', 'animated_texture', 'material_polish', 'particle_loop', 'low_level_method']
+        }
+      });
+      setAiFeatureDraft(draft);
+      setAiOutput(pretty(draft));
+      setBottomTab('ai');
+      pushLog(`AI 已生成特色玩法方案：${draft.title}。`);
+    });
+  }
+
+  function sendFeatureToLogicPrompt() {
+    if (!aiFeatureDraft) return;
+    setAiPrompt([
+      `请把下面这个特色玩法拆成 BlockForge 节点图草案：${aiFeatureDraft.title}`,
+      aiFeatureDraft.summary,
+      '',
+      '重点：',
+      ...aiFeatureDraft.logicPlan.map(item => `- ${item}`),
+      '',
+      '附加实现：',
+      ...aiFeatureDraft.forgeNotes.map(item => `- ${item}`)
+    ].join('\n'));
+    pushLog('已把特色玩法方案写入节点草案提示。');
+  }
+
+  function sendFeatureToProjectPlanPrompt() {
+    if (!aiFeatureDraft) return;
+    setAiProjectPrompt([
+      `请按下面的特色玩法方案补全 BlockForge 项目，但不要写 generated/forge：${aiFeatureDraft.title}`,
+      aiFeatureDraft.summary,
+      '',
+      '步骤：',
+      ...aiFeatureDraft.steps.map((step, index) => `${index + 1}. ${step}`),
+      '',
+      '资源计划：',
+      ...aiFeatureDraft.assetPlan.map(item => `- ${item}`),
+      '',
+      '逻辑计划：',
+      ...aiFeatureDraft.logicPlan.map(item => `- ${item}`)
+    ].join('\n'));
+    pushLog('已把特色玩法方案写入 AI 工程大改提示。');
+  }
+
   async function createAiProjectPlan() {
     await runAction('生成 AI 工程变更计划', async () => {
       if (!api || !project) return;
@@ -2825,9 +3022,10 @@ export default function App() {
                 <div className="button-row">
                   <button onClick={saveDrawnTexture} disabled={!project || Boolean(busy)}>保存绘制贴图并绑定</button>
                   <button onClick={openTextureEditorWindow} disabled={!project || Boolean(busy)}>弹出独立窗口</button>
+                  <button onClick={createAiTextureDraft} disabled={!project || Boolean(busy) || !appSettings.aiPermissions.textureDraft || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey)}>AI 画材质</button>
                   <button onClick={() => resetTextureCanvas()} disabled={Boolean(busy)}>清空画布</button>
                 </div>
-                <div className="hint">绘制器保存的是透明背景 PNG；如果要用外部参考图，点击左侧“选择 PNG 并自动绑定”。</div>
+                <div className="hint">绘制器保存的是透明背景 PNG；如果要用外部参考图，点击左侧“选择 PNG 并自动绑定”。AI 画材质会先生成草稿并铺到当前画布上。</div>
               </Panel>
               <Panel title="3D 模型编辑器">
                 <Field label="模型文件路径" value={modelPath} onChange={setModelPath} placeholder="留空时打开文件选择器" hint="支持导入 Blockbench 导出的 JSON 模型，也可以直接编辑当前模型内容。" />
@@ -2846,12 +3044,13 @@ export default function App() {
                   <button onClick={importModel} disabled={!project || Boolean(busy)}>导入 JSON 并绑定</button>
                   <button onClick={saveModelDraft} disabled={!project || Boolean(busy)}>保存模型</button>
                   <button onClick={saveModelEditorDraft} disabled={!project || Boolean(busy)}>保存草稿</button>
+                  <button onClick={createAiModelDraft} disabled={!project || Boolean(busy) || !appSettings.aiPermissions.modelDraft || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey)}>AI 生成模型</button>
                   <button onClick={resetModelDraft} disabled={!project || Boolean(busy)}>填充模板</button>
                   <button onClick={openModelEditorWindow} disabled={!project || Boolean(busy)}>弹出独立窗口</button>
                 </div>
                 <label>模型 JSON</label>
                 <textarea className="json-editor model-editor" value={modelJson} onChange={event => setModelJson(event.target.value)} placeholder={defaultModelJson()} />
-                <div className="hint">物品模型会生成到 assets/&lt;modid&gt;/models/item/，方块模型会生成到 assets/&lt;modid&gt;/models/block/。绑定模型后，元素属性里的 model 会指向这个文件名。</div>
+                <div className="hint">物品模型会生成到 assets/&lt;modid&gt;/models/item/，方块模型会生成到 assets/&lt;modid&gt;/models/block/。AI 模型草稿会保持 Minecraft / Blockbench JSON 格式，确认后再保存。</div>
                 <details className="advanced-block">
                   <summary>模型预览</summary>
                   <pre className="data-preview compact">{modelJson ? modelJson : defaultModelJson()}</pre>
@@ -3198,10 +3397,13 @@ export default function App() {
                   <BooleanField label="允许 AI 对话" value={appSettings.aiPermissions.chat} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, chat: value } })} />
                   <BooleanField label="允许读取项目上下文" value={appSettings.aiPermissions.readProjectContext} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, readProjectContext: value } })} />
                   <BooleanField label="允许生成节点草案" value={appSettings.aiPermissions.logicDraft} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, logicDraft: value } })} />
+                  <BooleanField label="允许生成材质草稿" value={appSettings.aiPermissions.textureDraft} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, textureDraft: value } })} />
+                  <BooleanField label="允许生成模型草稿" value={appSettings.aiPermissions.modelDraft} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, modelDraft: value } })} />
+                  <BooleanField label="允许生成特色方案" value={appSettings.aiPermissions.featureRecipe} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, featureRecipe: value } })} />
                   <BooleanField label="允许生成工程变更计划" value={appSettings.aiPermissions.projectPlan} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, projectPlan: value } })} />
                   <BooleanField label="允许直接应用工程变更计划" value={appSettings.aiPermissions.applyProjectPlan} onChange={value => void updateAppSettings({ aiPermissions: { ...appSettings.aiPermissions, applyProjectPlan: value } })} />
                 </div>
-                <div className="hint">默认只收紧直接应用权限，聊天和节点草案可用；如果你想让 AI 看得更少，就关闭“读取项目上下文”。</div>
+                <div className="hint">云端 AI 只在你允许的范围内工作。贴图、模型和特色玩法都会先产出草稿，再由你确认保存。</div>
               </Panel>
               <Panel title="免费 AI 对话">
                 <div className="chat-panel">
@@ -3228,6 +3430,40 @@ export default function App() {
                 </div>
                 <div className="hint">AI 只能返回节点草案 JSON。应用前会弹窗确认、转换为节点图并校验，不会直接写入 Java。关闭权限后，这里会直接锁定。</div>
                 <pre className="data-preview">{aiOutput || 'AI 节点草案 JSON 会显示在这里。'}</pre>
+              </Panel>
+              <Panel title="AI 材质草稿">
+                <textarea value={aiTexturePrompt} onChange={event => setAiTexturePrompt(event.target.value)} />
+                <div className="button-row wrap">
+                  <button onClick={createAiTextureDraft} disabled={!appSettings.aiPermissions.textureDraft || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成贴图草稿</button>
+                  <button onClick={saveDrawnTexture} disabled={!project || Boolean(busy)}>保存当前贴图</button>
+                </div>
+                <div className="hint">云端 AI 会返回 16x16 / 32x32 / 64x64 的像素草稿，再铺到当前绘制器。确认后再保存，贴图仍然由你掌控。</div>
+                <pre className="data-preview compact">{aiTextureDraft ? previewTextureDraft(aiTextureDraft) : 'AI 贴图草稿会显示在这里。'}</pre>
+              </Panel>
+              <Panel title="AI 模型草稿">
+                <textarea value={aiModelPrompt} onChange={event => setAiModelPrompt(event.target.value)} />
+                <div className="button-row wrap">
+                  <button onClick={createAiModelDraft} disabled={!appSettings.aiPermissions.modelDraft || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成模型草稿</button>
+                  <button onClick={saveModelDraft} disabled={!project || Boolean(busy)}>保存当前模型</button>
+                  <button onClick={saveModelEditorDraft} disabled={!project || Boolean(busy)}>保存草稿</button>
+                </div>
+                <div className="hint">这个入口会输出适合 Blockbench / MCPBlockbench 继续调整的模型 JSON，方便做方块动起来、武器摆动或材质细分。</div>
+                <pre className="data-preview compact">{aiModelDraft ? previewModelDraft(aiModelDraft) : 'AI 模型草稿会显示在这里。'}</pre>
+              </Panel>
+              <Panel title="AI 特色玩法方案">
+                <textarea value={aiFeaturePrompt} onChange={event => setAiFeaturePrompt(event.target.value)} />
+                <div className="button-row wrap">
+                  <button onClick={createAiFeatureRecipe} disabled={!appSettings.aiPermissions.featureRecipe || (providerNeedsApiKey(aiConfig) && !aiConfig.apiKey) || Boolean(busy)}>生成特色方案</button>
+                  <button onClick={sendFeatureToLogicPrompt} disabled={!aiFeatureDraft}>写入节点草案</button>
+                  <button onClick={sendFeatureToProjectPlanPrompt} disabled={!aiFeatureDraft}>写入工程大改</button>
+                </div>
+                <div className="hint">这里会把“方块动起来”“更多动画”“材质优化”“更低层的模组制作方法”拆成可执行路线，方便继续走节点图、资源和工程变更计划。</div>
+                {aiFeatureDraft && (
+                  <details className="advanced-block">
+                    <summary>特色方案预览</summary>
+                    <pre className="data-preview compact">{pretty(aiFeatureDraft)}</pre>
+                  </details>
+                )}
               </Panel>
               <Panel title="AI 工程大改">
                 <textarea value={aiProjectPrompt} onChange={event => setAiProjectPrompt(event.target.value)} />

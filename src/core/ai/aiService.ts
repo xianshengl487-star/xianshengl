@@ -1,4 +1,4 @@
-import type { AiChatMessage, AiProjectChangePlan, AiProviderConfig } from '../../shared/types/ai';
+import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../../shared/types/ai';
 
 export type ChatMessage = AiChatMessage;
 
@@ -166,6 +166,264 @@ export async function createLogicDraft(
 ): Promise<LogicGraphDraft> {
   const reply = await chat(config, buildLogicDraftPrompt(userPrompt, availableNodes, context));
   return parseLogicDraft(reply);
+}
+
+function sanitizeAssetName(value: unknown, fallback: string): string {
+  const raw = String(value || fallback).toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/^_+|_+$/g, '');
+  return raw || fallback;
+}
+
+function normalizeUsage(value: unknown, fallback: 'item_texture' | 'block_texture'): 'item_texture' | 'block_texture';
+function normalizeUsage(value: unknown, fallback: 'item_model' | 'block_model'): 'item_model' | 'block_model';
+function normalizeUsage(value: unknown, fallback: 'item_texture' | 'block_texture' | 'item_model' | 'block_model') {
+  if (fallback === 'item_texture' || fallback === 'block_texture') {
+    return value === 'block_texture' ? 'block_texture' : value === 'item_texture' ? 'item_texture' : fallback;
+  }
+  return value === 'block_model' ? 'block_model' : value === 'item_model' ? 'item_model' : fallback;
+}
+
+function normalizeTextureSize(value: unknown): 16 | 32 | 64 {
+  const next = Number(value);
+  if (next === 32 || next === 64) return next;
+  return 16;
+}
+
+function normalizeColor(value: unknown, fallback = 'transparent'): string {
+  const text = String(value || '').trim();
+  if (text === 'transparent') return text;
+  if (/^#[0-9a-f]{6}$/i.test(text)) return text.toLowerCase();
+  return fallback;
+}
+
+function rowsToPixels(rows: unknown, palette: Record<string, unknown>, size: 16 | 32 | 64): string[] {
+  if (!Array.isArray(rows)) return [];
+  const pixels: string[] = [];
+  for (let y = 0; y < size; y += 1) {
+    const row = String(rows[y] || '').padEnd(size, '.').slice(0, size);
+    for (let x = 0; x < size; x += 1) {
+      const key = row[x];
+      pixels.push(normalizeColor(palette[key], key === '.' ? 'transparent' : '#000000'));
+    }
+  }
+  return pixels;
+}
+
+function fallbackPixels(size: 16 | 32 | 64, palette: string[]): string[] {
+  const colors = palette.length > 0 ? palette : ['#7dd3fc', '#e0f2fe', '#155e75', '#ffffff'];
+  const center = (size - 1) / 2;
+  return Array.from({ length: size * size }, (_, index) => {
+    const x = index % size;
+    const y = Math.floor(index / size);
+    const distance = Math.abs(x - center) + Math.abs(y - center);
+    if (distance > size * 0.82 && (x + y) % 2 === 0) return 'transparent';
+    const band = Math.floor((x / Math.max(1, size - 1)) * colors.length);
+    const highlight = y < size * 0.22 && x > size * 0.18 && x < size * 0.82;
+    return highlight ? colors[Math.min(1, colors.length - 1)] : colors[Math.min(band, colors.length - 1)];
+  });
+}
+
+function normalizePixels(value: unknown, size: 16 | 32 | 64, palette: string[]): string[] {
+  const flat = Array.isArray(value)
+    ? value.flatMap(item => Array.isArray(item) ? item : [item]).map(item => normalizeColor(item, 'transparent'))
+    : [];
+  const expected = size * size;
+  if (flat.length >= expected) return flat.slice(0, expected);
+  if (flat.length > 0) return [...flat, ...fallbackPixels(size, palette).slice(flat.length, expected)];
+  return fallbackPixels(size, palette);
+}
+
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.map(item => String(item)).filter(Boolean) : [];
+}
+
+export function buildTextureDraftPrompt(userPrompt: string, context: Record<string, unknown>): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are BlockForge Studio cloud texture painter for Minecraft Java mods.',
+        'Return exactly one JSON object and nothing else.',
+        'The JSON object must be a texture_draft.',
+        'Use this compact shape:',
+        '{"type":"texture_draft","textureName":"ice_wand","textureUsage":"item_texture","textureOwner":"item:ice_wand","size":16,"palette":{".":"transparent","A":"#112233","B":"#77ccff"},"rows":["................","....AABB........"],"notes":["short Chinese note"]}.',
+        'Rows must contain exactly size strings and each string should be size characters. Use palette keys to draw pixel art.',
+        'You may also include pixels as a flat color array, but rows are preferred.',
+        'Minecraft vanilla pixel art style: readable silhouette, limited palette, clean highlights, no photo realism.',
+        'Do not return markdown, explanations, comments, code fences, or binary image data.'
+      ].join(' ')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({ userPrompt, context }, null, 2)
+    }
+  ];
+}
+
+export function parseTextureDraft(text: string, context: Record<string, unknown>): AiTextureDraft {
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(extractJson(text)) as Record<string, unknown>;
+  } catch {
+    throw new Error(`AI 贴图响应不是有效 JSON。原始响应片段：${previewText(text)}`);
+  }
+  if (value.type !== 'texture_draft') {
+    throw new Error(`AI 响应不是 texture_draft 对象。原始响应片段：${previewText(text)}`);
+  }
+  const size = normalizeTextureSize(value.size || context.textureSize);
+  const rawPalette = value.palette && typeof value.palette === 'object' && !Array.isArray(value.palette)
+    ? value.palette as Record<string, unknown>
+    : {};
+  const palette = Object.values(rawPalette).map(item => normalizeColor(item)).filter(item => item !== 'transparent');
+  const rowPixels = rowsToPixels(value.rows, rawPalette, size);
+  return {
+    type: 'texture_draft',
+    textureName: sanitizeAssetName(value.textureName, sanitizeAssetName(context.textureName, 'ai_texture')),
+    textureUsage: normalizeUsage(value.textureUsage, normalizeUsage(context.textureUsage, 'item_texture')),
+    textureOwner: String(value.textureOwner || context.textureOwner || 'item:example'),
+    size,
+    pixels: rowPixels.length > 0 ? rowPixels : normalizePixels(value.pixels, size, palette),
+    palette,
+    notes: asStringArray(value.notes)
+  };
+}
+
+export async function createTextureDraft(
+  config: AiProviderConfig,
+  userPrompt: string,
+  context: Record<string, unknown>
+): Promise<AiTextureDraft> {
+  const reply = await chat(config, buildTextureDraftPrompt(userPrompt, context));
+  return parseTextureDraft(reply, context);
+}
+
+export function buildModelDraftPrompt(userPrompt: string, context: Record<string, unknown>): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are BlockForge Studio cloud MCPBlockbench model draft generator.',
+        'Return exactly one JSON object and nothing else.',
+        'The JSON object must be a blockbench_model_draft.',
+        'Use this shape:',
+        '{"type":"blockbench_model_draft","modelName":"ice_wand_model","modelUsage":"item_model","modelOwner":"item:ice_wand","modelJson":{"parent":"minecraft:item/generated","textures":{"layer0":"modid:item/ice_wand"}},"textureHints":["..."],"animationHints":["..."],"notes":["..."]}.',
+        'modelJson must be valid Minecraft Java resource-pack model JSON that Blockbench can open/export for Forge 1.20.1.',
+        'For block models, prefer elements with from/to/faces and texture variables. For item models, include parent, textures, display, and elements when useful.',
+        'Use simple cubes and vanilla-compatible fields; do not invent Java code.',
+        'Do not return markdown, explanations outside JSON, comments, or code fences.'
+      ].join(' ')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({ userPrompt, context }, null, 2)
+    }
+  ];
+}
+
+export function parseModelDraft(text: string, context: Record<string, unknown>): AiModelDraft {
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(extractJson(text)) as Record<string, unknown>;
+  } catch {
+    throw new Error(`AI 模型响应不是有效 JSON。原始响应片段：${previewText(text)}`);
+  }
+  if (value.type !== 'blockbench_model_draft') {
+    throw new Error(`AI 响应不是 blockbench_model_draft 对象。原始响应片段：${previewText(text)}`);
+  }
+  const rawModel = value.modelJson;
+  const modelJson = typeof rawModel === 'string' ? rawModel : JSON.stringify(rawModel || {}, null, 2);
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(modelJson);
+  } catch {
+    throw new Error(`AI 返回的 modelJson 不是有效模型 JSON。原始响应片段：${previewText(modelJson)}`);
+  }
+  const content = JSON.stringify(parsed, null, 2);
+  return {
+    type: 'blockbench_model_draft',
+    modelName: sanitizeAssetName(value.modelName, sanitizeAssetName(context.modelName, 'ai_model')),
+    modelUsage: normalizeUsage(value.modelUsage, normalizeUsage(context.modelUsage, 'item_model')),
+    modelOwner: String(value.modelOwner || context.modelOwner || 'item:example'),
+    modelJson: content,
+    textureHints: asStringArray(value.textureHints),
+    animationHints: asStringArray(value.animationHints),
+    notes: asStringArray(value.notes),
+    mcpTarget: 'mcpblockbench-cloud-json'
+  };
+}
+
+export async function createModelDraft(
+  config: AiProviderConfig,
+  userPrompt: string,
+  context: Record<string, unknown>
+): Promise<AiModelDraft> {
+  const reply = await chat(config, buildModelDraftPrompt(userPrompt, context));
+  return parseModelDraft(reply, context);
+}
+
+export function buildFeatureRecipePrompt(userPrompt: string, context: Record<string, unknown>): ChatMessage[] {
+  return [
+    {
+      role: 'system',
+      content: [
+        'You are BlockForge Studio Minecraft mod feature designer.',
+        'Return exactly one JSON object and nothing else.',
+        'The JSON object must be a mod_feature_recipe.',
+        'Use this shape:',
+        '{"type":"mod_feature_recipe","title":"moving crystal block","featureKind":"animated_block","summary":"...","difficulty":"medium","recommendedElements":["block:crystal_core"],"steps":["..."],"assetPlan":["..."],"logicPlan":["..."],"forgeNotes":["..."],"nextActions":["..."]}.',
+        'Focus on features the app can help build: animated blocks, animated textures, material polish, particle/sound loops, block entity ideas, node logic, mcfunction, Forge event notes, and low-level mod-making method.',
+        'Explain practical steps in Chinese. Do not write full Java source unless asked.',
+        'Do not return markdown, explanations outside JSON, comments, or code fences.'
+      ].join(' ')
+    },
+    {
+      role: 'user',
+      content: JSON.stringify({ userPrompt, context }, null, 2)
+    }
+  ];
+}
+
+function normalizeFeatureKind(value: unknown): AiModFeatureDraft['featureKind'] {
+  if (value === 'animated_block' || value === 'animated_texture' || value === 'material_polish' || value === 'low_level_method') return value;
+  return 'custom';
+}
+
+function normalizeDifficulty(value: unknown): AiModFeatureDraft['difficulty'] {
+  if (value === 'hard' || value === 'medium') return value;
+  return 'easy';
+}
+
+export function parseFeatureRecipe(text: string): AiModFeatureDraft {
+  let value: Record<string, unknown>;
+  try {
+    value = JSON.parse(extractJson(text)) as Record<string, unknown>;
+  } catch {
+    throw new Error(`AI 特色玩法响应不是有效 JSON。原始响应片段：${previewText(text)}`);
+  }
+  if (value.type !== 'mod_feature_recipe') {
+    throw new Error(`AI 响应不是 mod_feature_recipe 对象。原始响应片段：${previewText(text)}`);
+  }
+  return {
+    type: 'mod_feature_recipe',
+    title: String(value.title || '特色玩法方案'),
+    featureKind: normalizeFeatureKind(value.featureKind),
+    summary: String(value.summary || ''),
+    difficulty: normalizeDifficulty(value.difficulty),
+    recommendedElements: asStringArray(value.recommendedElements),
+    steps: asStringArray(value.steps),
+    assetPlan: asStringArray(value.assetPlan),
+    logicPlan: asStringArray(value.logicPlan),
+    forgeNotes: asStringArray(value.forgeNotes),
+    nextActions: asStringArray(value.nextActions)
+  };
+}
+
+export async function createFeatureRecipe(
+  config: AiProviderConfig,
+  userPrompt: string,
+  context: Record<string, unknown>
+): Promise<AiModFeatureDraft> {
+  const reply = await chat(config, buildFeatureRecipePrompt(userPrompt, context));
+  return parseFeatureRecipe(reply);
 }
 
 export function buildProjectChangePrompt(userPrompt: string, projectFiles: Array<{ path: string; content: string }>, context: Record<string, unknown>): ChatMessage[] {

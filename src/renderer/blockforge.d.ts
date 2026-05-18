@@ -1,4 +1,4 @@
-import type { AiChatMessage, AiProjectApplyResult, AiProjectChangePlan, AiProviderConfig } from '../shared/types/ai';
+import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectApplyResult, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../shared/types/ai';
 import type { Diagnostic, ElementModel } from '../shared/types/elements';
 import type { ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
@@ -63,6 +63,7 @@ type TextureEditorDraft = {
   textureColor: string;
   textureTool: 'pencil' | 'eraser' | 'fill' | 'eyedropper';
   texturePixels: string[];
+  texturePixelScale?: number;
   updatedAt?: string;
 };
 
@@ -167,6 +168,9 @@ declare global {
         listModels(payload: { config?: AiProviderConfig }): Promise<string[]>;
         chat(payload: { config?: AiProviderConfig; messages: AiChatMessage[]; context: Record<string, unknown> }): Promise<string>;
         createLogicDraft(payload: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }): Promise<unknown>;
+        createTextureDraft(payload: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }): Promise<AiTextureDraft>;
+        createModelDraft(payload: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }): Promise<AiModelDraft>;
+        createFeatureRecipe(payload: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }): Promise<AiModFeatureDraft>;
         createProjectChangePlan(payload: { projectDir: string; config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }): Promise<{ plan: AiProjectChangePlan; validationErrors: string[]; scannedFiles: string[] }>;
         applyProjectChangePlan(payload: { projectDir: string; plan: AiProjectChangePlan }): Promise<AiProjectApplyResult>;
         saveChatTranscript(payload: { projectDir: string; messages: AiChatMessage[] }): Promise<string>;

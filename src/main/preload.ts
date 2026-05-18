@@ -90,6 +90,9 @@ contextBridge.exposeInMainWorld('blockforge', {
     listModels: (payload: unknown) => invoke('ai:listModels', payload),
     chat: (payload: unknown) => invoke('ai:chat', payload),
     createLogicDraft: (payload: unknown) => invoke('ai:createLogicDraft', payload),
+    createTextureDraft: (payload: unknown) => invoke('ai:createTextureDraft', payload),
+    createModelDraft: (payload: unknown) => invoke('ai:createModelDraft', payload),
+    createFeatureRecipe: (payload: unknown) => invoke('ai:createFeatureRecipe', payload),
     createProjectChangePlan: (payload: unknown) => invoke('ai:createProjectChangePlan', payload),
     applyProjectChangePlan: (payload: unknown) => invoke('ai:applyProjectChangePlan', payload),
     saveChatTranscript: (payload: unknown) => invoke('ai:saveChatTranscript', payload)

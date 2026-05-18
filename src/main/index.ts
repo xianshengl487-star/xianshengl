@@ -25,7 +25,7 @@ import { builtInNodeTypes, createNode } from '../core/logic/nodeRegistry';
 import { createDefaultLogicGraph, loadLogicGraphs, saveLogicGraph } from '../core/logic/logicService';
 import { compileGraphToIR, validateLogicGraph } from '../core/ir/logicCompiler';
 import { generateForgeEventHandler } from '../core/generator/forge/forgeEventGenerator';
-import { createAssistantReply, createLogicDraft, createProjectChangePlan, listModels, testConnection } from '../core/ai/aiService';
+import { createAssistantReply, createFeatureRecipe, createLogicDraft, createModelDraft, createProjectChangePlan, createTextureDraft, listModels, testConnection } from '../core/ai/aiService';
 import { applyProjectChangePlan, collectProjectFilesForAi, validateProjectChangePlan } from '../core/ai/projectChangeService';
 import { exportProjectZip } from '../core/export/exportService';
 import { runPrivacyScan } from '../core/privacy/privacyScanService';
@@ -423,6 +423,18 @@ function registerIpc() {
   ipcMain.handle('ai:createLogicDraft', async (_event, input: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }) => {
     const config = input.config || await readJson(userDataFile('ai-provider.json'), defaultAiConfig());
     return createLogicDraft(config, input.prompt, builtInNodeTypes, input.context);
+  });
+  ipcMain.handle('ai:createTextureDraft', async (_event, input: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }) => {
+    const config = input.config || await readJson(userDataFile('ai-provider.json'), defaultAiConfig());
+    return createTextureDraft(config, input.prompt, input.context);
+  });
+  ipcMain.handle('ai:createModelDraft', async (_event, input: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }) => {
+    const config = input.config || await readJson(userDataFile('ai-provider.json'), defaultAiConfig());
+    return createModelDraft(config, input.prompt, input.context);
+  });
+  ipcMain.handle('ai:createFeatureRecipe', async (_event, input: { config?: AiProviderConfig; prompt: string; context: Record<string, unknown> }) => {
+    const config = input.config || await readJson(userDataFile('ai-provider.json'), defaultAiConfig());
+    return createFeatureRecipe(config, input.prompt, input.context);
   });
   ipcMain.handle('ai:chat', async (_event, input: { config?: AiProviderConfig; messages: AiChatMessage[]; context: Record<string, unknown> }) => {
     const config = input.config || await readJson(userDataFile('ai-provider.json'), defaultAiConfig());

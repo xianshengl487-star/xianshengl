@@ -89,3 +89,40 @@ export interface AiProjectApplyResult {
   changedFiles: string[];
   deletedFiles: string[];
 }
+
+export interface AiTextureDraft {
+  type: 'texture_draft';
+  textureName: string;
+  textureUsage: 'item_texture' | 'block_texture';
+  textureOwner: string;
+  size: 16 | 32 | 64;
+  pixels: string[];
+  palette: string[];
+  notes: string[];
+}
+
+export interface AiModelDraft {
+  type: 'blockbench_model_draft';
+  modelName: string;
+  modelUsage: 'item_model' | 'block_model';
+  modelOwner: string;
+  modelJson: string;
+  textureHints: string[];
+  animationHints: string[];
+  notes: string[];
+  mcpTarget: 'mcpblockbench-cloud-json';
+}
+
+export interface AiModFeatureDraft {
+  type: 'mod_feature_recipe';
+  title: string;
+  featureKind: 'animated_block' | 'animated_texture' | 'material_polish' | 'low_level_method' | 'custom';
+  summary: string;
+  difficulty: 'easy' | 'medium' | 'hard';
+  recommendedElements: string[];
+  steps: string[];
+  assetPlan: string[];
+  logicPlan: string[];
+  forgeNotes: string[];
+  nextActions: string[];
+}
