@@ -118,10 +118,10 @@ function actionToJava(step: IRStep, variables: LogicVariable[]): string {
   if (step.kind === 'variable_add') {
     return variable ? `${javaIdentifier(variable.id)} = ${javaIdentifier(variable.id)} + ${numberExpr(step.args.amount, variables, 1)};` : '// TODO variable not found';
   }
-  if (step.kind === 'nbt_set_string') return `event.getItemStack().getOrCreateTag().putString("${nbtKey(step)}", ${stringExpr(step.args.value, variables)});`;
-  if (step.kind === 'nbt_set_number') return `event.getItemStack().getOrCreateTag().putDouble("${nbtKey(step)}", ${numberExpr(step.args.value, variables, 0)});`;
-  if (step.kind === 'nbt_set_boolean') return `event.getItemStack().getOrCreateTag().putBoolean("${nbtKey(step)}", ${booleanExpr(step.args.value, variables, false)});`;
-  if (step.kind === 'nbt_remove') return `if (event.getItemStack().hasTag()) event.getItemStack().getTag().remove("${nbtKey(step)}");`;
+  if (step.kind === 'nbt_set_string') return `bfItemStack.getOrCreateTag().putString("${nbtKey(step)}", ${stringExpr(step.args.value, variables)});`;
+  if (step.kind === 'nbt_set_number') return `bfItemStack.getOrCreateTag().putDouble("${nbtKey(step)}", ${numberExpr(step.args.value, variables, 0)});`;
+  if (step.kind === 'nbt_set_boolean') return `bfItemStack.getOrCreateTag().putBoolean("${nbtKey(step)}", ${booleanExpr(step.args.value, variables, false)});`;
+  if (step.kind === 'nbt_remove') return `if (bfItemStack.hasTag()) bfItemStack.getTag().remove("${nbtKey(step)}");`;
   if (step.kind === 'give_item') return `BlockForgeGameActions.giveItem(player, ${stringExpr(step.args.item || 'minecraft:diamond', variables)}, Math.max(1, (int) (${numberExpr(step.args.count, variables, 1)})));`;
   if (step.kind === 'give_effect') return `BlockForgeGameActions.giveEffect(player, ${stringExpr(step.args.effect || 'minecraft:speed', variables)}, Math.max(1, (int) (${numberExpr(step.args.seconds, variables, 5)})), Math.max(0, (int) (${numberExpr(step.args.amplifier, variables, 1)})));`;
   if (step.kind === 'play_sound') return `BlockForgeGameActions.playSound(level, player.blockPosition(), ${stringExpr(step.args.sound || 'minecraft:block.amethyst_block.chime', variables)}, (float) (${numberExpr(step.args.volume, variables, 1)}), (float) (${numberExpr(step.args.pitch, variables, 1)}));`;
@@ -147,18 +147,79 @@ function stepToJava(step: IRStep, variables: LogicVariable[]): string {
     const variable = variableById(variables, step.args.variable);
     return `        if (${variableCondition(variable, step.args.value, 'gte', variables)}) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
   }
-  if (step.kind === 'nbt_has_key') return `        if (event.getItemStack().hasTag() && event.getItemStack().getTag().contains("${nbtKey(step)}")) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
-  if (step.kind === 'nbt_string_equals') return `        if (event.getItemStack().hasTag() && (${stringExpr(step.args.value, variables)}).equals(event.getItemStack().getTag().getString("${nbtKey(step)}"))) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
-  if (step.kind === 'nbt_number_gte') return `        if (event.getItemStack().hasTag() && event.getItemStack().getTag().getDouble("${nbtKey(step)}") >= ${numberExpr(step.args.value, variables, 0)}) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
+  if (step.kind === 'nbt_has_key') return `        if (bfItemStack.hasTag() && bfItemStack.getTag().contains("${nbtKey(step)}")) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
+  if (step.kind === 'nbt_string_equals') return `        if (bfItemStack.hasTag() && (${stringExpr(step.args.value, variables)}).equals(bfItemStack.getTag().getString("${nbtKey(step)}"))) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
+  if (step.kind === 'nbt_number_gte') return `        if (bfItemStack.hasTag() && bfItemStack.getTag().getDouble("${nbtKey(step)}") >= ${numberExpr(step.args.value, variables, 0)}) {\n${branchToJava(step.then, variables)}\n        } else {\n${branchToJava(step.else, variables)}\n        }`;
   return `        // TODO unsupported condition: ${step.kind}`;
 }
 
+function eventMethodName(eventType: string) {
+  return `on${eventType.replace(/(^|_)([a-z])/g, (_match, _sep, value: string) => value.toUpperCase())}`;
+}
+
+function handlerSetup(eventType: string) {
+  if (eventType === 'block_right_click') {
+    return {
+      eventClass: 'PlayerInteractEvent.RightClickBlock',
+      setup: '        Player player = event.getEntity();\n        Level level = event.getLevel();\n        BlockPos bfBlockPos = event.getPos();\n        ItemStack bfItemStack = event.getItemStack();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'block_break') {
+    return {
+      eventClass: 'BlockEvent.BreakEvent',
+      setup: '        Player player = event.getPlayer();\n        Level level = (Level) event.getLevel();\n        BlockPos bfBlockPos = event.getPos();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'block_place') {
+    return {
+      eventClass: 'BlockEvent.EntityPlaceEvent',
+      setup: '        if (!(event.getEntity() instanceof Player player)) return;\n        Level level = (Level) event.getLevel();\n        BlockPos bfBlockPos = event.getPos();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'player_join') {
+    return {
+      eventClass: 'PlayerEvent.PlayerLoggedInEvent',
+      setup: '        Player player = event.getEntity();\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'player_tick') {
+    return {
+      eventClass: 'TickEvent.PlayerTickEvent',
+      setup: '        if (event.phase != TickEvent.Phase.END) return;\n        Player player = event.player;\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'player_hurt') {
+    return {
+      eventClass: 'LivingHurtEvent',
+      setup: '        if (!(event.getEntity() instanceof Player player)) return;\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'living_death') {
+    return {
+      eventClass: 'LivingDeathEvent',
+      setup: '        if (!(event.getSource().getEntity() instanceof Player player)) return;\n        Level level = player.level();\n        BlockPos bfBlockPos = event.getEntity().blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'world_tick') {
+    return {
+      eventClass: 'TickEvent.LevelTickEvent',
+      setup: '        if (event.phase != TickEvent.Phase.END) return;\n        Level level = event.level;\n        if (level.isClientSide) return;\n        Player player = level.players().isEmpty() ? null : level.players().get(0);\n        if (player == null) return;\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n'
+    };
+  }
+  return {
+    eventClass: 'PlayerInteractEvent.RightClickItem',
+    setup: '        Player player = event.getEntity();\n        Level level = event.getLevel();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = event.getItemStack();\n        if (level.isClientSide) return;\n'
+  };
+}
+
 export function generateForgeEventHandler(packageName: string, ir: BlockForgeIR): string {
+  const eventType = ir.event.type || 'item_right_click';
+  const context = handlerSetup(eventType);
   const target = ir.event.target?.startsWith('item:') ? ir.event.target.split(':')[1] : undefined;
-  const targetGuard = target ? `        if (!event.getItemStack().is(${packageName}.registry.ModItems.${constantName(target)}.get())) return;\n` : '';
+  const targetGuard = target ? `        if (!bfItemStack.is(${packageName}.registry.ModItems.${constantName(target)}.get())) return;\n` : '';
   const variables = ir.variables || [];
   const variableCode = variables.length ? `${variables.map(variableDeclaration).join('\n')}\n` : '';
-  return `package ${packageName}.logic;\n\nimport net.minecraftforge.event.entity.player.PlayerInteractEvent;\nimport net.minecraftforge.eventbus.api.SubscribeEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.level.Level;\n\n@Mod.EventBusSubscriber\npublic class GeneratedEventHandlers {\n    @SubscribeEvent\n    public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {\n        Player player = event.getEntity();\n        Level level = event.getLevel();\n        if (level.isClientSide) return;\n${targetGuard}${variableCode}${ir.steps.map(step => stepToJava(step, variables)).join('\n')}\n    }\n}\n`;
+  return `package ${packageName}.logic;\n\nimport net.minecraftforge.event.entity.player.PlayerInteractEvent;\nimport net.minecraftforge.event.entity.player.PlayerEvent;\nimport net.minecraftforge.event.entity.living.LivingHurtEvent;\nimport net.minecraftforge.event.entity.living.LivingDeathEvent;\nimport net.minecraftforge.event.level.BlockEvent;\nimport net.minecraftforge.event.TickEvent;\nimport net.minecraftforge.eventbus.api.SubscribeEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.level.Level;\n\n@Mod.EventBusSubscriber\npublic class GeneratedEventHandlers {\n    @SubscribeEvent\n    public static void ${eventMethodName(eventType)}(${context.eventClass} event) {\n${context.setup}${targetGuard}${variableCode}${ir.steps.map(step => stepToJava(step, variables)).join('\n')}\n    }\n}\n`;
 }
 
 export function generateCooldowns(packageName: string): string {
