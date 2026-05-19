@@ -1,5 +1,5 @@
 import type { ElementModel } from './elements';
-import type { LoaderId } from './project';
+import type { LoaderId, ModCompatibilityEntry } from './project';
 
 export type PluginViewTarget =
   | 'home'
@@ -53,6 +53,11 @@ export interface PluginDocLink {
   description?: string;
 }
 
+export interface PluginCompatibilityPreset extends ModCompatibilityEntry {
+  id: string;
+  tags?: string[];
+}
+
 export interface PluginAction {
   id: string;
   label: string;
@@ -70,6 +75,7 @@ export interface PluginContributions {
   actions?: PluginAction[];
   aiPrompts?: PluginAiPrompt[];
   elementBlueprints?: PluginElementBlueprint[];
+  compatibilityPresets?: PluginCompatibilityPreset[];
   docs?: PluginDocLink[];
 }
 

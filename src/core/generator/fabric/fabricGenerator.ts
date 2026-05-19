@@ -1,9 +1,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement, ToolElement } from '../../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement, StructureElement, ToolElement } from '../../../shared/types/elements';
 import type { BlockForgeIR } from '../../../shared/types/logic';
 import type { ProjectModel } from '../../../shared/types/project';
 import { copyResourcesToGenerated } from '../../resources/resourceService';
+import { structureFunctionCommands } from '../structureFunctionGenerator';
 
 type ItemLikeElement = ItemElement | ToolElement;
 
@@ -11,6 +12,15 @@ function javaPackagePath(pkg: string): string { return pkg.replace(/\./g, '/'); 
 function className(id: string): string { return id.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(''); }
 function constantName(id: string): string { return id.replace(/[^a-zA-Z0-9_]/g, '_').toUpperCase(); }
 function resourceId(modId: string, id: string): string { return id.includes(':') ? id : `${modId}:${id}`; }
+function tagId(modId: string, id: string): string { return resourceId(modId, id.replace(/^#/, '')); }
+function ingredientJson(modId: string, id: string): { item: string } | { tag: string } {
+  return id.trim().startsWith('#') ? { tag: tagId(modId, id.trim()) } : { item: resourceId(modId, id.trim()) };
+}
+function lootEntryJson(modId: string, id: string): { type: string; name: string; expand?: boolean } {
+  return id.trim().startsWith('#')
+    ? { type: 'minecraft:tag', name: tagId(modId, id.trim()), expand: true }
+    : { type: 'minecraft:item', name: resourceId(modId, id.trim()) };
+}
 async function write(file: string, content: string) { await fs.mkdir(path.dirname(file), { recursive: true }); await fs.writeFile(file, content, 'utf8'); }
 async function writeJson(file: string, value: unknown) { await write(file, `${JSON.stringify(value, null, 2)}\n`); }
 
@@ -129,14 +139,14 @@ function recipeJson(project: ProjectModel, recipe: RecipeElement): unknown {
   const props = recipe.properties;
   const result = { item: resourceId(project.modId, props.result), count: Number(props.count || 1) };
   if (props.recipeType === 'shaped') {
-    const key = Object.fromEntries(Object.entries(props.key || { A: 'minecraft:stone' }).map(([slot, item]) => [slot, { item: resourceId(project.modId, item) }]));
+    const key = Object.fromEntries(Object.entries(props.key || { A: 'minecraft:stone' }).map(([slot, item]) => [slot, ingredientJson(project.modId, item)]));
     return { type: 'minecraft:crafting_shaped', category: props.category || 'misc', pattern: props.pattern?.length ? props.pattern : ['A'], key, result };
   }
   if (props.recipeType === 'smelting') {
     return {
       type: 'minecraft:smelting',
       category: props.category || 'misc',
-      ingredient: { item: resourceId(project.modId, props.input || 'minecraft:stone') },
+      ingredient: ingredientJson(project.modId, props.input || 'minecraft:stone'),
       result: resourceId(project.modId, props.result),
       experience: Number(props.experience || 0),
       cookingtime: Number(props.cookingTime || 200)
@@ -145,7 +155,7 @@ function recipeJson(project: ProjectModel, recipe: RecipeElement): unknown {
   return {
     type: 'minecraft:crafting_shapeless',
     category: props.category || 'misc',
-    ingredients: (props.ingredients?.length ? props.ingredients : ['minecraft:stone']).map(item => ({ item: resourceId(project.modId, item) })),
+    ingredients: (props.ingredients?.length ? props.ingredients : ['minecraft:stone']).map(item => ingredientJson(project.modId, item)),
     result
   };
 }
@@ -161,7 +171,7 @@ function lootTableJson(project: ProjectModel, loot: LootTableElement): unknown {
     type: 'minecraft:block',
     pools: [{
       rolls: 1,
-      entries: [{ type: 'minecraft:item', name: resourceId(project.modId, props.drop) }],
+      entries: [lootEntryJson(project.modId, props.drop)],
       functions
     }]
   };
@@ -392,11 +402,12 @@ export interface FabricGenerateInput {
   mobEffects?: MobEffectElement[];
   potions?: PotionElement[];
   enchantments?: EnchantmentElement[];
+  structures?: StructureElement[];
   logicIR?: BlockForgeIR[];
 }
 
 export async function generateFabricProject(input: FabricGenerateInput): Promise<{ root: string; copiedResources: number; preview: string }> {
-  const { projectDir, project, items, blocks, recipes = [], lootTables = [], functions = [], mobEffects = [], potions = [], enchantments = [], logicIR = [] } = input;
+  const { projectDir, project, items, blocks, recipes = [], lootTables = [], functions = [], mobEffects = [], potions = [], enchantments = [], structures = [], logicIR = [] } = input;
   const root = path.join(projectDir, 'generated/fabric');
   const resolvedRoot = path.resolve(root);
   const resolvedProject = path.resolve(projectDir);
@@ -477,6 +488,9 @@ export async function generateFabricProject(input: FabricGenerateInput): Promise
   for (const recipe of recipes) await writeJson(path.join(resDir, `data/${project.modId}/recipes/${recipe.id}.json`), recipeJson(project, recipe));
   for (const loot of lootTables) await writeJson(path.join(resDir, `data/${project.modId}/loot_tables/blocks/${loot.properties.targetBlock || loot.id}.json`), lootTableJson(project, loot));
   for (const fn of functions) await write(path.join(resDir, `data/${project.modId}/functions/${fn.id}.mcfunction`), `${fn.properties.commands.trim()}\n`);
+  for (const structure of structures) {
+    await write(path.join(resDir, `data/${project.modId}/functions/structures/${structure.id}.mcfunction`), `${structureFunctionCommands(project, structure).join('\n')}\n`);
+  }
 
   const copied = await copyResourcesToGenerated(projectDir, project.modId, 'fabric');
   const preview = [

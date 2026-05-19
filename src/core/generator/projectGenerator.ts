@@ -1,4 +1,4 @@
-import type { BlockElement, EnchantmentElement, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, RecipeElement, ToolElement } from '../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, RecipeElement, StructureElement, ToolElement } from '../../shared/types/elements';
 import type { BlockForgeIR } from '../../shared/types/logic';
 import type { ProjectModel } from '../../shared/types/project';
 import { generateFabricProject } from './fabric/fabricGenerator';
@@ -17,6 +17,7 @@ export interface ProjectGenerateInput {
   mobEffects?: MobEffectElement[];
   potions?: PotionElement[];
   enchantments?: EnchantmentElement[];
+  structures?: StructureElement[];
   logicIR?: BlockForgeIR[];
 }
 
@@ -37,6 +38,7 @@ export async function generateProjectArtifacts(input: ProjectGenerateInput): Pro
       mobEffects: input.mobEffects || [],
       potions: input.potions || [],
       enchantments: input.enchantments || [],
+      structures: input.structures || [],
       logicIR: input.logicIR || []
     });
   }
@@ -58,6 +60,7 @@ export async function generateProjectArtifacts(input: ProjectGenerateInput): Pro
     mobEffects: input.mobEffects || [],
     potions: input.potions || [],
     enchantments: input.enchantments || [],
+    structures: input.structures || [],
     logicIR: input.logicIR || []
   });
 }

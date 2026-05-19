@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('blockforge', {
     createMobEffect: (payload: unknown) => invoke('elements:createMobEffect', payload),
     createPotion: (payload: unknown) => invoke('elements:createPotion', payload),
     createEnchantment: (payload: unknown) => invoke('elements:createEnchantment', payload),
+    createStructure: (payload: unknown) => invoke('elements:createStructure', payload),
     save: (payload: unknown) => invoke('elements:save', payload),
     duplicate: (payload: unknown) => invoke('elements:duplicate', payload),
     delete: (payload: unknown) => invoke('elements:delete', payload),

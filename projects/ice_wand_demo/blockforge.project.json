@@ -15,7 +15,94 @@
   "primaryLoader": "forge",
   "license": "All Rights Reserved",
   "createdAt": "2026-05-14T06:23:53.228Z",
-  "updatedAt": "2026-05-14T06:23:53.228Z",
+  "updatedAt": "2026-05-19T03:58:39.555Z",
+  "compatibility": {
+    "externalMods": [
+      {
+        "modId": "create",
+        "displayName": "Create / 机械动力",
+        "versionRange": "[0.5.1,)",
+        "dependencyType": "required",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Create 附属模组依赖。Gradle 坐标随发行渠道变化较大，确认实际 Maven 坐标后再填写；留空时只写 mods.toml 依赖，不破坏构建。"
+      },
+      {
+        "modId": "jei",
+        "displayName": "Just Enough Items",
+        "versionRange": "[15,)",
+        "dependencyType": "optional",
+        "side": "client",
+        "gradleCoordinate": "",
+        "note": "配方查看器兼容。Forge 坐标请按 JEI 官方发行页填写；留空时只作为 mods.toml 可选依赖。"
+      },
+      {
+        "modId": "emi",
+        "displayName": "EMI",
+        "versionRange": "[1,)",
+        "dependencyType": "optional",
+        "side": "client",
+        "gradleCoordinate": "",
+        "note": "EMI 配方查看器兼容占位。"
+      },
+      {
+        "modId": "curios",
+        "displayName": "Curios API",
+        "versionRange": "[5,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Forge 饰品槽兼容占位。具体坐标请按 Curios 发行页填写。"
+      },
+      {
+        "modId": "trinkets",
+        "displayName": "Trinkets",
+        "versionRange": "[3,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Fabric 饰品槽兼容占位。"
+      },
+      {
+        "modId": "farmersdelight",
+        "displayName": "Farmer's Delight",
+        "versionRange": "[1.2,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "农夫乐事兼容占位。具体坐标请按发行渠道填写。"
+      },
+      {
+        "modId": "botania",
+        "displayName": "Botania",
+        "versionRange": "[1.20,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "植物魔法兼容占位。"
+      },
+      {
+        "modId": "thermal",
+        "displayName": "Thermal Series",
+        "versionRange": "[11,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Thermal 系列兼容占位。"
+      }
+    ],
+    "acceptedNamespaces": [
+      "create",
+      "jei",
+      "emi",
+      "curios",
+      "trinkets",
+      "farmersdelight",
+      "botania",
+      "thermal"
+    ],
+    "allowExternalTags": true
+  },
   "features": {
     "datapack": true,
     "resourcepack": true,

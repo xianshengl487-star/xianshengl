@@ -21,6 +21,7 @@ export const projectDirs = [
   'editor/elements/mob_effects',
   'editor/elements/potions',
   'editor/elements/enchantments',
+  'editor/elements/structures',
   'editor/logic',
   'editor/variables',
   'editor/resources/textures/item',

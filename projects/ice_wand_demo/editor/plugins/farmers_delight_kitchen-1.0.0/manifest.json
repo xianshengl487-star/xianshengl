@@ -1,0 +1,115 @@
+{
+  "kind": "blockforge.plugin",
+  "schemaVersion": "0.1.0",
+  "id": "farmers_delight_kitchen",
+  "name": "农夫乐事厨房扩展",
+  "version": "1.0.0",
+  "author": "BlockForge Studio",
+  "description": "面向 Farmer’s Delight 的食物、锅具、作物和厨房配方扩展，适合制作生活向 DLC。",
+  "compatibleBlockForge": "0.1.0",
+  "compatibleMinecraft": [
+    "1.20.1"
+  ],
+  "compatibleLoaders": [
+    "forge"
+  ],
+  "tags": [
+    "farmersdelight",
+    "food",
+    "cooking",
+    "crops"
+  ],
+  "safety": "declarative",
+  "contributes": {
+    "compatibilityPresets": [
+      {
+        "id": "farmersdelight_optional",
+        "modId": "farmersdelight",
+        "displayName": "Farmer's Delight",
+        "versionRange": "[1.2,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "农夫乐事兼容占位。具体坐标请按发行渠道填写。",
+        "tags": [
+          "food",
+          "forge"
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "id": "food_card",
+        "title": "特色食物蓝图",
+        "description": "创建一个带饱食度、稀有度和材质提示的新食物。",
+        "tone": "grass",
+        "actionId": "food_blueprint",
+        "tags": [
+          "食物"
+        ]
+      },
+      {
+        "id": "crop_card",
+        "title": "作物线提示",
+        "description": "让 AI 规划从作物、掉落、配方到食物效果的整条内容线。",
+        "tone": "plank",
+        "actionId": "crop_line_prompt",
+        "tags": [
+          "作物",
+          "配方"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "food_blueprint",
+        "label": "生成特色食物",
+        "description": "创建一个可继续加入药水效果和配方的食物物品。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "special_food",
+          "label": "特色食物",
+          "kind": "item",
+          "elementId": "gearberry_pie",
+          "zhName": "齿轮莓派",
+          "description": "生活向附属食物草稿：可继续绑定配方、药水效果和贴图。",
+          "properties": {
+            "itemKind": "food",
+            "maxStackSize": 16,
+            "rarity": "uncommon",
+            "foodNutrition": 8,
+            "foodSaturation": 0.8,
+            "alwaysEat": false,
+            "texture": "gearberry_pie",
+            "creativeTab": "food_and_drinks"
+          }
+        }
+      },
+      {
+        "id": "crop_line_prompt",
+        "label": "规划作物料理线",
+        "description": "让 AI 生成作物、配方、掉落和效果路线。",
+        "kind": "set_ai_prompt",
+        "promptTarget": "feature",
+        "prompt": "为 Farmer’s Delight 风格附属模组设计一条完整料理线：新作物、种子来源、掉落表、食物、锅具/切菜板配方、药水效果、本地化和贴图建议。"
+      }
+    ],
+    "aiPrompts": [
+      {
+        "id": "food_texture",
+        "label": "食物材质提示",
+        "target": "texture",
+        "prompt": "生成一张 16x16 Minecraft 食物贴图：温暖、清晰、适合 Farmer’s Delight 风格，边缘有像素高光。",
+        "description": "用于食物贴图。"
+      }
+    ],
+    "docs": [
+      {
+        "id": "farmersdelight",
+        "title": "Farmer's Delight GitHub",
+        "url": "https://github.com/vectorwing/FarmersDelight",
+        "description": "农夫乐事源码与发行信息。"
+      }
+    ]
+  }
+}

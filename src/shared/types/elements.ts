@@ -1,6 +1,6 @@
 import type { LoaderId } from './project';
 
-export type ElementType = 'item' | 'block' | 'tool' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment';
+export type ElementType = 'item' | 'block' | 'tool' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment' | 'structure';
 
 export interface Diagnostic {
   level: 'error' | 'warning' | 'info';
@@ -180,6 +180,26 @@ export interface FunctionProperties {
   commands: string;
 }
 
+export type StructureKind = 'cottage' | 'tower' | 'platform' | 'wall' | 'arena';
+
+export interface StructureProperties {
+  structureKind: StructureKind;
+  width: number;
+  depth: number;
+  height: number;
+  floorBlock: string;
+  wallBlock: string;
+  roofBlock: string;
+  accentBlock: string;
+  glassBlock: string;
+  doorBlock: string;
+  torchBlock: string;
+  hollow: boolean;
+  includeInterior: boolean;
+  includeLights: boolean;
+  includeLootChest: boolean;
+}
+
 export type ItemElement = ElementModel<ItemProperties> & { type: 'item' };
 export type ToolElement = ElementModel<ItemProperties> & { type: 'tool' };
 export type BlockElement = ElementModel<BlockProperties> & { type: 'block' };
@@ -189,3 +209,4 @@ export type FunctionElement = ElementModel<FunctionProperties> & { type: 'functi
 export type MobEffectElement = ElementModel<MobEffectProperties> & { type: 'mob_effect' };
 export type PotionElement = ElementModel<PotionProperties> & { type: 'potion' };
 export type EnchantmentElement = ElementModel<EnchantmentProperties> & { type: 'enchantment' };
+export type StructureElement = ElementModel<StructureProperties> & { type: 'structure' };

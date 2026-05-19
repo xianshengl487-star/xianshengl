@@ -1,0 +1,256 @@
+{
+  "kind": "blockforge.plugin",
+  "schemaVersion": "0.1.0",
+  "id": "create_dlc_studio",
+  "name": "机械动力 DLC 工作室",
+  "version": "1.0.0",
+  "author": "BlockForge Studio",
+  "description": "面向 Create / 机械动力附属模组的声明式插件：提供依赖提示、机械方块蓝图、工厂建筑、配方思路、AI 设计提示和教程链接。",
+  "compatibleBlockForge": "0.1.0",
+  "compatibleMinecraft": [
+    "1.20.1"
+  ],
+  "compatibleLoaders": [
+    "forge"
+  ],
+  "tags": [
+    "create",
+    "addon",
+    "kinetics",
+    "automation",
+    "forge"
+  ],
+  "safety": "declarative",
+  "contributes": {
+    "compatibilityPresets": [
+      {
+        "id": "create_forge_required",
+        "modId": "create",
+        "displayName": "Create / 机械动力",
+        "versionRange": "[0.5.1,)",
+        "dependencyType": "required",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Create 附属模组依赖。Gradle 坐标随发行渠道变化较大，确认实际 Maven 坐标后再填写；留空时只写 mods.toml 依赖，不破坏构建。",
+        "tags": [
+          "kinetics",
+          "forge"
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "id": "create_dependency_card",
+        "title": "Create 依赖预设",
+        "description": "提示你在项目设置里加入机械动力依赖，生成 Forge 工程时会写入 mods.toml 和 Gradle 依赖。",
+        "tone": "redstone",
+        "actionId": "create_dependency_prompt",
+        "tags": [
+          "依赖",
+          "Create",
+          "Forge"
+        ]
+      },
+      {
+        "id": "kinetic_machine_card",
+        "title": "机械方块蓝图",
+        "description": "快速创建一个“扭矩加工机”方块，再继续补贴图、模型、GUI 和事件节点。",
+        "tone": "stone",
+        "actionId": "kinetic_machine_blueprint",
+        "tags": [
+          "方块",
+          "机器",
+          "GUI"
+        ]
+      },
+      {
+        "id": "cog_material_card",
+        "title": "齿轮材料链",
+        "description": "生成齿轮合金材料和后续配方思路，适合做 Create 附属的前置材料。",
+        "tone": "ore",
+        "actionId": "cog_alloy_blueprint",
+        "tags": [
+          "材料",
+          "配方"
+        ]
+      },
+      {
+        "id": "factory_structure_card",
+        "title": "小型机械工坊",
+        "description": "生成一座 Create 风格工坊建筑结构，后续可用 /function 一键放置。",
+        "tone": "plank",
+        "actionId": "factory_structure_blueprint",
+        "tags": [
+          "建筑",
+          "mcfunction"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "create_dependency_prompt",
+        "label": "写入 Create 依赖教程",
+        "description": "把 AI 提示切换到 Create 附属依赖配置，方便你复制到项目设置的兼容模组里。",
+        "kind": "set_ai_prompt",
+        "promptTarget": "project",
+        "prompt": "请帮我把当前 BlockForge 项目配置成 Create / 机械动力 Forge 1.20.1 附属模组。需要说明：modId=create，显示名=Create，依赖类型=required，side=both，版本范围建议 [0.5.1,)，Gradle 坐标需要根据实际 Maven 仓库确认；同时提醒不要把 API Key 或私人路径写进项目。"
+      },
+      {
+        "id": "kinetic_machine_blueprint",
+        "label": "生成扭矩加工机方块",
+        "description": "创建一个适合继续接 GUI、旋转动画、配方和事件逻辑的机械方块。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "kinetic_machine",
+          "label": "扭矩加工机",
+          "kind": "block",
+          "elementId": "kinetic_processor",
+          "zhName": "扭矩加工机",
+          "description": "Create 附属机器方块草稿：用于接入旋转动力、物品输入输出、加工配方和动画材质。",
+          "properties": {
+            "hardness": 4,
+            "resistance": 6,
+            "soundType": "METAL",
+            "lightLevel": 2,
+            "requiresCorrectTool": true,
+            "textureAll": "kinetic_processor",
+            "model": "kinetic_processor_model"
+          }
+        }
+      },
+      {
+        "id": "cog_alloy_blueprint",
+        "label": "生成齿轮合金材料",
+        "description": "创建一个可作为 Create 扩展配方原料的材料物品。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "cog_alloy",
+          "label": "齿轮合金",
+          "kind": "item",
+          "elementId": "cog_alloy",
+          "zhName": "齿轮合金",
+          "description": "用于机械动力附属配方的中间材料，可继续绑定贴图、配方和战利品来源。",
+          "properties": {
+            "itemKind": "generic",
+            "maxStackSize": 64,
+            "rarity": "uncommon",
+            "creativeTab": "ingredients",
+            "texture": "cog_alloy"
+          }
+        }
+      },
+      {
+        "id": "factory_structure_blueprint",
+        "label": "生成机械工坊建筑",
+        "description": "创建一个小型机械工坊结构蓝图，生成工程后输出 mcfunction。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "factory_structure",
+          "label": "小型机械工坊",
+          "kind": "structure",
+          "elementId": "create_workshop",
+          "zhName": "小型机械工坊",
+          "description": "Create 风格的小型机械工坊结构：石砖墙、铜色屋顶、玻璃窗和灯光。",
+          "properties": {
+            "structureKind": "cottage",
+            "width": 13,
+            "depth": 11,
+            "height": 6,
+            "floorBlock": "minecraft:stone_bricks",
+            "wallBlock": "minecraft:bricks",
+            "roofBlock": "minecraft:copper_block",
+            "accentBlock": "minecraft:stripped_spruce_log",
+            "glassBlock": "minecraft:glass_pane",
+            "doorBlock": "minecraft:spruce_door",
+            "torchBlock": "minecraft:lantern",
+            "hollow": true,
+            "includeInterior": true,
+            "includeLights": true,
+            "includeLootChest": true
+          }
+        }
+      }
+    ],
+    "aiPrompts": [
+      {
+        "id": "create_addon_design",
+        "label": "Create 附属玩法设计",
+        "target": "feature",
+        "prompt": "为 Minecraft Forge 1.20.1 的 Create / 机械动力附属模组设计一个可实现功能：包含新机器、输入输出、加工配方、动力需求、动画/材质建议、GUI 草图、节点事件和低层实现路径。不要直接写 Java，先输出 BlockForge 可编辑的元素与节点计划。",
+        "description": "用于从玩法层面构思机械动力 DLC 内容。"
+      },
+      {
+        "id": "create_texture_style",
+        "label": "Create 风格材质",
+        "target": "texture",
+        "prompt": "生成一张 16x16 Minecraft 像素材质草案，风格接近机械动力 Create：铜、安山岩、黄铜、齿轮、铆钉、工业边框，高对比但不要过度写实。",
+        "description": "用于机器方块、齿轮材料、外壳和工坊装饰。"
+      },
+      {
+        "id": "create_model_style",
+        "label": "Create 风格 3D 模型",
+        "target": "model",
+        "prompt": "生成一个可导入 Blockbench 的机械动力风格低面数模型方案：包含齿轮、传动轴、外壳、正面输入口和轻微动画部件，并说明纹理命名。",
+        "description": "用于 AI 模型草案或 Blockbench 外部编辑。"
+      },
+      {
+        "id": "create_dependency_review",
+        "label": "Create 依赖检查",
+        "target": "project",
+        "prompt": "检查当前项目是否适合作为 Create 附属模组：Forge 版本、Minecraft 版本、mods.toml mandatory 依赖、Gradle 坐标、资源命名、命名空间、配方是否引用 create: 命名空间，并列出风险。",
+        "description": "用于生成前自查。"
+      }
+    ],
+    "elementBlueprints": [
+      {
+        "id": "andesite_casing_recipe",
+        "label": "安山机壳配方草稿",
+        "kind": "recipe",
+        "elementId": "andesite_casing_recipe",
+        "zhName": "安山机壳配方草稿",
+        "description": "演示如何引用 create: 命名空间或通用标签，后续请按实际 Create 版本调整。",
+        "properties": {
+          "recipeType": "shapeless",
+          "category": "misc",
+          "ingredients": [
+            "minecraft:andesite",
+            "#forge:plates/iron"
+          ],
+          "result": "create:andesite_casing",
+          "count": 1
+        }
+      },
+      {
+        "id": "steam_whistle_function",
+        "label": "蒸汽哨声函数",
+        "kind": "function",
+        "elementId": "steam_whistle",
+        "zhName": "蒸汽哨声",
+        "description": "一个用于测试粒子和音效的 mcfunction，可以绑定到按钮或右键事件。",
+        "properties": {
+          "commands": "particle minecraft:campfire_cosy_smoke ~ ~1 ~ 0.3 0.6 0.3 0.02 20\nplaysound minecraft:block.copper.place block @p ~ ~ ~ 0.8 1.1"
+        }
+      }
+    ],
+    "docs": [
+      {
+        "id": "create_github",
+        "title": "Create GitHub",
+        "url": "https://github.com/Creators-of-Create/Create",
+        "description": "查看机械动力源码、版本和发行说明。"
+      },
+      {
+        "id": "create_wiki",
+        "title": "Create Wiki",
+        "url": "https://create.fandom.com/wiki/Create_Mod_Wiki",
+        "description": "查询机械动力方块、配方和玩法概念。"
+      },
+      {
+        "id": "forge_docs",
+        "title": "Forge 文档",
+        "url": "https://docs.minecraftforge.net/",
+        "description": "用于核对 Forge 1.20.1 的注册、数据包和依赖写法。"
+      }
+    ]
+  }
+}

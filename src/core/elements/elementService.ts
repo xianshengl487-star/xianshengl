@@ -10,6 +10,7 @@ import type {
   MobEffectElement,
   PotionElement,
   RecipeElement,
+  StructureElement,
   ToolElement
 } from '../../shared/types/elements';
 import type { ProjectModel } from '../../shared/types/project';
@@ -194,6 +195,30 @@ export function createFunctionElement(project: ProjectModel, id: string, zhName:
   };
 }
 
+export function createStructure(project: ProjectModel, id: string, zhName: string): StructureElement {
+  return {
+    ...baseElement(project, id, zhName),
+    type: 'structure',
+    properties: {
+      structureKind: 'cottage',
+      width: 9,
+      depth: 9,
+      height: 5,
+      floorBlock: 'minecraft:spruce_planks',
+      wallBlock: 'minecraft:stone_bricks',
+      roofBlock: 'minecraft:spruce_stairs',
+      accentBlock: 'minecraft:stripped_spruce_log',
+      glassBlock: 'minecraft:glass_pane',
+      doorBlock: 'minecraft:spruce_door',
+      torchBlock: 'minecraft:lantern',
+      hollow: true,
+      includeInterior: true,
+      includeLights: true,
+      includeLootChest: false
+    }
+  };
+}
+
 export function folderForElementType(type: ElementModel['type']): string {
   if (type === 'block') return 'blocks';
   if (type === 'item') return 'items';
@@ -204,6 +229,7 @@ export function folderForElementType(type: ElementModel['type']): string {
   if (type === 'mob_effect') return 'mob_effects';
   if (type === 'potion') return 'potions';
   if (type === 'enchantment') return 'enchantments';
+  if (type === 'structure') return 'structures';
   return `${type}s`;
 }
 
@@ -271,7 +297,7 @@ export async function loadElements<T extends ElementModel<unknown>>(projectDir: 
 }
 
 export async function loadElementSet(projectDir: string) {
-  const [items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments] = await Promise.all([
+  const [items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments, structures] = await Promise.all([
     loadElements<ItemElement>(projectDir, 'items'),
     loadElements<ToolElement>(projectDir, 'tools'),
     loadElements<BlockElement>(projectDir, 'blocks'),
@@ -280,7 +306,8 @@ export async function loadElementSet(projectDir: string) {
     loadElements<FunctionElement>(projectDir, 'functions'),
     loadElements<MobEffectElement>(projectDir, 'mob_effects'),
     loadElements<PotionElement>(projectDir, 'potions'),
-    loadElements<EnchantmentElement>(projectDir, 'enchantments')
+    loadElements<EnchantmentElement>(projectDir, 'enchantments'),
+    loadElements<StructureElement>(projectDir, 'structures')
   ]);
-  return { items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments };
+  return { items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments, structures };
 }

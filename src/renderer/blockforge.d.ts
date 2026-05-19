@@ -43,6 +43,7 @@ type ElementSet = {
   mobEffects: ElementModel[];
   potions: ElementModel[];
   enchantments: ElementModel[];
+  structures: ElementModel[];
 };
 
 type AppSettings = {
@@ -119,6 +120,7 @@ declare global {
         createMobEffect(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createPotion(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createEnchantment(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
+        createStructure(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         save(payload: { projectDir: string; element: ElementModel }): Promise<ElementSet>;
         duplicate(payload: { projectDir: string; element: ElementModel; newId: string; zhName?: string }): Promise<{ copied: ElementModel; elements: ElementSet }>;
         delete(payload: { projectDir: string; type: ElementModel['type']; id: string }): Promise<ElementSet>;

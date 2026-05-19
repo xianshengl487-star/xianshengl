@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../shared/types/ai';
 import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../shared/types/ai';
-import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, ItemRarity, ItemUseAnimation, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
+import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, ItemRarity, ItemUseAnimation, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, StructureKind, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
 import { loaderDeployFolder, loaderDisplayName, loaderOutputFolder, loaderShortName, type LoaderId, type ModCompatibilityEntry, type ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
@@ -11,7 +11,7 @@ import type { BlockForgePluginManifest, InstalledPlugin, PluginAction, PluginAiP
 
 type ViewId = 'home' | 'design' | 'elements' | 'resources' | 'logic' | 'ui' | 'forge' | 'ai' | 'plugins' | 'manage' | 'settings';
 type BottomId = 'logs' | 'diagnostics' | 'ir' | 'code' | 'ai';
-type ElementKind = 'item' | 'tool' | 'block' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment';
+type ElementKind = 'item' | 'tool' | 'block' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment' | 'structure';
 type TextureTool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 type TextureSize = 16 | 32 | 64;
 type ModelUsage = 'item_model' | 'block_model';
@@ -26,6 +26,7 @@ type ElementSet = {
   mobEffects: ElementModel[];
   potions: ElementModel[];
   enchantments: ElementModel[];
+  structures: ElementModel[];
 };
 
 type ResourceContextMenu = {
@@ -197,8 +198,8 @@ type PrivacyScanResult = {
 const api = window.blockforge;
 const textureEditorMode = new URLSearchParams(window.location.search).get('textureEditor') === '1';
 const modelEditorMode = new URLSearchParams(window.location.search).get('modelEditor') === '1';
-const initialProjectDir = new URLSearchParams(window.location.search).get('projectDir') || 'E:\\MCMOD\\projects\\ice_wand_demo';
-const emptyElements: ElementSet = { items: [], tools: [], blocks: [], recipes: [], lootTables: [], functions: [], mobEffects: [], potions: [], enchantments: [] };
+const initialProjectDir = new URLSearchParams(window.location.search).get('projectDir') || 'projects/ice_wand_demo';
+const emptyElements: ElementSet = { items: [], tools: [], blocks: [], recipes: [], lootTables: [], functions: [], mobEffects: [], potions: [], enchantments: [], structures: [] };
 const kindLabels: Record<ElementKind, string> = {
   item: '物品',
   tool: '工具',
@@ -208,7 +209,15 @@ const kindLabels: Record<ElementKind, string> = {
   function: 'mcfunction',
   mob_effect: '状态效果',
   potion: '药水',
-  enchantment: '附魔'
+  enchantment: '附魔',
+  structure: '建筑结构'
+};
+const structureKindLabels: Record<StructureKind, string> = {
+  cottage: '小屋 / 生存基地',
+  tower: '高塔 / 哨站',
+  platform: '平台 / 机器底座',
+  wall: '城墙 / 屏障',
+  arena: '竞技场 / Boss 场地'
 };
 const itemKindLabels: Record<ItemKind, string> = {
   generic: '普通物品 / 材料',
@@ -299,6 +308,7 @@ const compatibilityPresets: CompatibilityPreset[] = [
   { modId: 'patchouli', displayName: 'Patchouli', versionRange: '[84,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '内置手册、教程书和多页说明。' },
   { modId: 'architectury', displayName: 'Architectury API', versionRange: '[9,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '多加载器公共 API 兼容层。' }
 ];
+const commonIngredientTags = ['#forge:ingots/iron', '#forge:ingots/gold', '#forge:ingots/copper', '#forge:gems/diamond', '#forge:dusts/redstone', '#minecraft:planks', '#minecraft:logs'];
 const variableTypeLabels: Record<LogicVariableType, string> = {
   number: '数字',
   string: '文本',
@@ -794,7 +804,8 @@ export default function App() {
     ...elements.functions,
     ...elements.mobEffects,
     ...elements.potions,
-    ...elements.enchantments
+    ...elements.enchantments,
+    ...elements.structures
   ], [elements]);
   const filteredElements = useMemo(() => {
     const keyword = elementFilter.trim().toLowerCase();
@@ -860,6 +871,16 @@ export default function App() {
       elementName: '铜制工作台',
       view: 'elements',
       tone: 'redstone'
+    },
+    {
+      id: 'structure_line',
+      title: '建筑结构线',
+      subtitle: '一键生成小屋、高塔、平台、城墙或竞技场 mcfunction。',
+      elementKind: 'structure',
+      elementId: 'starter_cottage',
+      elementName: '起步小屋',
+      view: 'elements',
+      tone: 'grass'
     },
     {
       id: 'survival_line',
@@ -947,7 +968,7 @@ export default function App() {
         title: '元素系统',
         status: projectStats.elements > 0 ? 'active' : project ? 'todo' : 'blocked',
         progress: Math.min(100, projectStats.elements * 18),
-        summary: `物品 ${elements.items.length}、工具 ${elements.tools.length}、方块 ${elements.blocks.length}、配方 ${elements.recipes.length}、战利品表 ${elements.lootTables.length}、函数 ${elements.functions.length}`,
+        summary: `物品 ${elements.items.length}、工具 ${elements.tools.length}、方块 ${elements.blocks.length}、建筑 ${elements.structures.length}、配方 ${elements.recipes.length}、战利品表 ${elements.lootTables.length}、函数 ${elements.functions.length}`,
         nextAction: projectStats.elements > 0 ? '继续细化属性和说明' : '至少创建一个物品或方块',
         view: 'elements'
       },
@@ -1006,7 +1027,7 @@ export default function App() {
         view: 'ai'
       }
     ];
-  }, [aiChatMessages.length, aiConfig.displayName, aiConfig.model, aiConfig.provider, aiProjectPlan, codePreview.length, diagnostics, elements.blocks.length, elements.functions.length, elements.items.length, elements.tools.length, elements.lootTables.length, elements.recipes.length, project, projectStats.elements, projectStats.graphs, projectStats.plugins, projectStats.resources, projectStats.screens]);
+  }, [aiChatMessages.length, aiConfig.displayName, aiConfig.model, aiConfig.provider, aiProjectPlan, codePreview.length, diagnostics, elements.blocks.length, elements.functions.length, elements.items.length, elements.tools.length, elements.lootTables.length, elements.recipes.length, elements.structures.length, project, projectStats.elements, projectStats.graphs, projectStats.plugins, projectStats.resources, projectStats.screens]);
   const designScore = useMemo(() => {
     if (designModules.length === 0) return 0;
     return Math.round(designModules.reduce((sum, item) => sum + item.progress, 0) / designModules.length);
@@ -1020,6 +1041,7 @@ export default function App() {
   const pluginActions = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.actions || []).map(action => ({ ...action, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
   const pluginPrompts = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.aiPrompts || []).map(prompt => ({ ...prompt, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
   const pluginBlueprints = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.elementBlueprints || []).map(blueprint => ({ ...blueprint, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
+  const pluginCompatibilityPresets = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.compatibilityPresets || []).map(preset => ({ ...preset, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
   const pluginDocs = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.docs || []).map(doc => ({ ...doc, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
 
   const canUseBridge = Boolean(api);
@@ -1220,7 +1242,8 @@ export default function App() {
         function: api.elements.createFunction,
         mob_effect: api.elements.createMobEffect,
         potion: api.elements.createPotion,
-        enchantment: api.elements.createEnchantment
+        enchantment: api.elements.createEnchantment,
+        structure: api.elements.createStructure
       }[elementKind];
       const element = await creator(payload);
       setDraftElement(element);
@@ -2181,7 +2204,8 @@ export default function App() {
         function: api.elements.createFunction,
         mob_effect: api.elements.createMobEffect,
         potion: api.elements.createPotion,
-        enchantment: api.elements.createEnchantment
+        enchantment: api.elements.createEnchantment,
+        structure: api.elements.createStructure
       }[blueprint.kind];
       const element = await creator(payload);
       const patched = {
@@ -3108,6 +3132,7 @@ export default function App() {
           <TreeGroup title={`状态效果 (${elements.mobEffects.length})`} items={elements.mobEffects} onPick={pickElement} />
           <TreeGroup title={`药水 (${elements.potions.length})`} items={elements.potions} onPick={pickElement} />
           <TreeGroup title={`附魔 (${elements.enchantments.length})`} items={elements.enchantments} onPick={pickElement} />
+          <TreeGroup title={`建筑 (${elements.structures.length})`} items={elements.structures} onPick={pickElement} />
           <TreeGroup title={`配方 (${elements.recipes.length})`} items={elements.recipes} onPick={pickElement} />
           <TreeGroup title={`战利品表 (${elements.lootTables.length})`} items={elements.lootTables} onPick={pickElement} />
           <TreeGroup title={`函数 (${elements.functions.length})`} items={elements.functions} onPick={pickElement} />
@@ -3246,6 +3271,7 @@ export default function App() {
                   <button onClick={() => { setElementKind('mob_effect'); setElementId('frostbite'); setElementName('霜寒状态'); setActiveView('elements'); }}>状态效果</button>
                   <button onClick={() => { setElementKind('potion'); setElementId('frost_potion'); setElementName('霜寒药水'); setActiveView('elements'); }}>药水</button>
                   <button onClick={() => { setElementKind('enchantment'); setElementId('frost_affinity'); setElementName('霜寒亲和'); setActiveView('elements'); }}>附魔</button>
+                  <button onClick={() => { setElementKind('structure'); setElementId('starter_cottage'); setElementName('起步小屋'); setActiveView('elements'); }}>建筑结构</button>
                   <button onClick={() => { setElementKind('recipe'); setElementId('core_recipe'); setElementName('核心配方'); setActiveView('elements'); }}>合成配方</button>
                   <button onClick={() => { setElementKind('loot_table'); setElementId('block_loot'); setElementName('方块掉落'); setActiveView('elements'); }}>掉落表</button>
                   <button onClick={() => { setElementKind('function'); setElementId('cast_spell'); setElementName('施法函数'); setActiveView('elements'); }}>mcfunction</button>
@@ -4376,6 +4402,19 @@ export default function App() {
                   ))}
                 </div>
                 <div className="list-panel">
+                  {pluginCompatibilityPresets.length === 0 && <div className="tree-empty">插件兼容预设会显示在这里。</div>}
+                  {pluginCompatibilityPresets.map(preset => (
+                    <div className="list-row" key={`${preset.pluginId}:${preset.id}`}>
+                      <div>
+                        <strong>{preset.displayName}</strong>
+                        <span>{preset.pluginName} · {preset.modId} · {preset.dependencyType} · {preset.side}</span>
+                        <small>{preset.note || preset.versionRange}</small>
+                      </div>
+                      <button onClick={() => setActiveView('settings')}>查看设置</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="list-panel">
                   {pluginDocs.length === 0 && <div className="tree-empty">插件文档链接会显示在这里。</div>}
                   {pluginDocs.map(doc => (
                     <div className="list-row" key={`${doc.pluginId}:${doc.id}`}>
@@ -4831,6 +4870,32 @@ function ElementQuickEditor({ element, project, onChange }: { element: ElementMo
           </div>
         </>
       )}
+      {element.type === 'structure' && (
+        <>
+          <SelectField label="建筑预设" value={String(props.structureKind ?? 'cottage')} options={structureKindLabels} onChange={value => updateProp('structureKind', value)} />
+          <NumberField label="宽度 X" value={Number(props.width ?? 9)} onChange={value => updateProp('width', value)} />
+          <NumberField label="深度 Z" value={Number(props.depth ?? 9)} onChange={value => updateProp('depth', value)} />
+          <NumberField label="高度 Y" value={Number(props.height ?? 5)} onChange={value => updateProp('height', value)} />
+          <Field label="地板方块" value={String(props.floorBlock ?? 'minecraft:spruce_planks')} onChange={value => updateProp('floorBlock', value)} hint="可填写 minecraft:stone，也可以填写本模组方块 ID，例如 frost_block。" />
+          <Field label="墙体方块" value={String(props.wallBlock ?? 'minecraft:stone_bricks')} onChange={value => updateProp('wallBlock', value)} />
+          <Field label="屋顶方块" value={String(props.roofBlock ?? 'minecraft:spruce_planks')} onChange={value => updateProp('roofBlock', value)} />
+          <Field label="装饰柱方块" value={String(props.accentBlock ?? 'minecraft:stripped_spruce_log')} onChange={value => updateProp('accentBlock', value)} />
+          <Field label="窗户方块" value={String(props.glassBlock ?? 'minecraft:glass_pane')} onChange={value => updateProp('glassBlock', value)} />
+          <Field label="门方块" value={String(props.doorBlock ?? 'minecraft:spruce_door')} onChange={value => updateProp('doorBlock', value)} />
+          <Field label="灯光方块" value={String(props.torchBlock ?? 'minecraft:lantern')} onChange={value => updateProp('torchBlock', value)} />
+          <BooleanField label="空心建筑" value={Boolean(props.hollow ?? true)} onChange={value => updateProp('hollow', value)} />
+          <BooleanField label="加入基础内饰" value={Boolean(props.includeInterior ?? true)} onChange={value => updateProp('includeInterior', value)} />
+          <BooleanField label="加入灯光" value={Boolean(props.includeLights ?? true)} onChange={value => updateProp('includeLights', value)} />
+          <BooleanField label="加入宝箱占位" value={Boolean(props.includeLootChest)} onChange={value => updateProp('includeLootChest', value)} />
+          <div className="button-row mini">
+            <button type="button" onClick={() => onChange({ ...element, properties: { ...props, structureKind: 'cottage', width: 9, depth: 9, height: 5, floorBlock: 'minecraft:spruce_planks', wallBlock: 'minecraft:stone_bricks', roofBlock: 'minecraft:spruce_planks', accentBlock: 'minecraft:stripped_spruce_log', glassBlock: 'minecraft:glass_pane', doorBlock: 'minecraft:spruce_door', torchBlock: 'minecraft:lantern', includeInterior: true, includeLights: true } })}>生存小屋</button>
+            <button type="button" onClick={() => onChange({ ...element, properties: { ...props, structureKind: 'tower', width: 7, depth: 7, height: 14, floorBlock: 'minecraft:stone_bricks', wallBlock: 'minecraft:cobbled_deepslate', roofBlock: 'minecraft:deepslate_tiles', accentBlock: 'minecraft:polished_deepslate', glassBlock: 'minecraft:glass_pane', doorBlock: 'minecraft:iron_door', torchBlock: 'minecraft:lantern', includeInterior: false, includeLights: true } })}>哨塔</button>
+            <button type="button" onClick={() => onChange({ ...element, properties: { ...props, structureKind: 'arena', width: 21, depth: 21, height: 4, floorBlock: 'minecraft:smooth_sandstone', wallBlock: 'minecraft:sandstone_wall', accentBlock: 'minecraft:cut_sandstone', includeInterior: false, includeLights: true } })}>竞技场</button>
+            <button type="button" onClick={() => onChange({ ...element, properties: { ...props, structureKind: 'platform', width: 15, depth: 15, height: 1, floorBlock: 'minecraft:smooth_stone', accentBlock: 'minecraft:stone_brick_wall', includeInterior: false, includeLights: true } })}>机器平台</button>
+          </div>
+          <div className="hint">生成工程后会写入 data/{project?.modId || 'modid'}/functions/structures/{element.id}.mcfunction。进入游戏站在建筑正门中心位置，执行 /function {project?.modId || 'modid'}:structures/{element.id} 即可生成。</div>
+        </>
+      )}
       {element.type === 'mob_effect' && (
         <>
           <SelectField label="效果分类" value={String(props.category ?? 'beneficial')} options={mobEffectCategoryLabels} onChange={value => updateProp('category', value)} />
@@ -4911,6 +4976,9 @@ function ElementQuickEditor({ element, project, onChange }: { element: ElementMo
               />
               <div className="hint">有序合成使用多行形状和 A=item 形式的材料映射。</div>
               <div className="button-row mini">
+                {commonIngredientTags.slice(0, 5).map(tag => (
+                  <button key={tag} type="button" onClick={() => updateProp('key', { ...(props.key || {}), X: tag })}>{tag}</button>
+                ))}
                 {(compatibilityMods.slice(0, 6)).map(entry => (
                   <button key={entry.modId} type="button" onClick={() => updateProp('key', { ...(props.key || {}), X: `${entry.modId}:` })}>{entry.displayName || entry.modId}</button>
                 ))}
@@ -4927,6 +4995,9 @@ function ElementQuickEditor({ element, project, onChange }: { element: ElementMo
               />
               <div className="hint">无序合成每行一个材料，也可以用逗号分隔。</div>
               <div className="button-row mini">
+                {commonIngredientTags.map(tag => (
+                  <button key={tag} type="button" onClick={() => updateProp('ingredients', [...(Array.isArray(props.ingredients) ? props.ingredients : []), tag])}>{tag}</button>
+                ))}
                 {(compatibilityMods.slice(0, 6)).map(entry => (
                   <button key={entry.modId} type="button" onClick={() => updateProp('ingredients', [...(Array.isArray(props.ingredients) ? props.ingredients : []), `${entry.modId}:`])}>{entry.displayName || entry.modId}</button>
                 ))}

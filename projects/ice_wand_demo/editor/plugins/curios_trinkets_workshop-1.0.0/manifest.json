@@ -1,0 +1,121 @@
+{
+  "kind": "blockforge.plugin",
+  "schemaVersion": "0.1.0",
+  "id": "curios_trinkets_workshop",
+  "name": "饰品槽与装备扩展工坊",
+  "version": "1.0.0",
+  "author": "BlockForge Studio",
+  "description": "面向 Curios / Trinkets 的饰品、护符、戒指和被动效果附属内容，适合做装备扩展 DLC。",
+  "compatibleBlockForge": "0.1.0",
+  "compatibleMinecraft": [
+    "1.20.1"
+  ],
+  "compatibleLoaders": [
+    "forge",
+    "fabric"
+  ],
+  "tags": [
+    "curios",
+    "trinkets",
+    "equipment",
+    "magic"
+  ],
+  "safety": "declarative",
+  "contributes": {
+    "compatibilityPresets": [
+      {
+        "id": "curios_optional",
+        "modId": "curios",
+        "displayName": "Curios API",
+        "versionRange": "[5,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Forge 饰品槽兼容占位。具体坐标请按 Curios 发行页填写。",
+        "tags": [
+          "equipment",
+          "forge"
+        ]
+      },
+      {
+        "id": "trinkets_optional",
+        "modId": "trinkets",
+        "displayName": "Trinkets",
+        "versionRange": "[3,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Fabric 饰品槽兼容占位。",
+        "tags": [
+          "equipment",
+          "fabric"
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "id": "ring_card",
+        "title": "戒指/护符蓝图",
+        "description": "生成一个可继续绑定被动效果和 NBT 的饰品物品。",
+        "tone": "ore",
+        "actionId": "ring_blueprint",
+        "tags": [
+          "饰品",
+          "NBT"
+        ]
+      },
+      {
+        "id": "passive_logic_card",
+        "title": "被动效果节点提示",
+        "description": "生成“装备后周期触发”的节点逻辑草案提示。",
+        "tone": "redstone",
+        "actionId": "passive_logic_prompt",
+        "tags": [
+          "节点",
+          "事件"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "ring_blueprint",
+        "label": "生成护符物品",
+        "description": "创建一个饰品类物品草稿。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "amulet_item",
+          "label": "护符物品",
+          "kind": "item",
+          "elementId": "clockwork_amulet",
+          "zhName": "发条护符",
+          "description": "饰品/护符草稿：适合绑定 Curios/Trinkets 插槽、NBT 充能和周期事件。",
+          "properties": {
+            "itemKind": "generic",
+            "maxStackSize": 1,
+            "rarity": "rare",
+            "durability": 256,
+            "texture": "clockwork_amulet",
+            "creativeTab": "combat"
+          }
+        }
+      },
+      {
+        "id": "passive_logic_prompt",
+        "label": "生成被动饰品逻辑提示",
+        "description": "让 AI 设计装备时持续生效的节点图。",
+        "kind": "set_ai_prompt",
+        "promptTarget": "logic",
+        "prompt": "为一个 Curios/Trinkets 饰品设计 BlockForge 节点图草案：装备时每 40 tick 检查 NBT 能量，如果能量大于 0 就给玩家速度或抗性效果，并扣除能量。只输出 logic_graph_draft JSON。"
+      }
+    ],
+    "aiPrompts": [
+      {
+        "id": "trinket_design",
+        "label": "饰品玩法设计",
+        "target": "feature",
+        "prompt": "设计一个 Minecraft 饰品扩展玩法：插槽、被动效果、NBT 能量、冷却、合成配方、贴图风格和事件节点。",
+        "description": "适合做装备 DLC。"
+      }
+    ]
+  }
+}

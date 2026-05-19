@@ -1,0 +1,137 @@
+{
+  "kind": "blockforge.plugin",
+  "schemaVersion": "0.1.0",
+  "id": "recipe_viewer_bridge",
+  "name": "配方查看器兼容桥",
+  "version": "1.0.0",
+  "author": "BlockForge Studio",
+  "description": "面向 JEI / EMI / REI 的配方展示插件：帮助模组作者整理配方、说明文本、标签和查看器兼容注意事项。",
+  "compatibleBlockForge": "0.1.0",
+  "compatibleMinecraft": [
+    "1.20.1"
+  ],
+  "compatibleLoaders": [
+    "forge",
+    "fabric"
+  ],
+  "tags": [
+    "jei",
+    "emi",
+    "rei",
+    "recipes",
+    "compatibility"
+  ],
+  "safety": "declarative",
+  "contributes": {
+    "compatibilityPresets": [
+      {
+        "id": "jei_optional",
+        "modId": "jei",
+        "displayName": "Just Enough Items",
+        "versionRange": "[15,)",
+        "dependencyType": "optional",
+        "side": "client",
+        "gradleCoordinate": "",
+        "note": "配方查看器兼容。Forge 坐标请按 JEI 官方发行页填写；留空时只作为 mods.toml 可选依赖。",
+        "tags": [
+          "recipe-viewer",
+          "forge"
+        ]
+      },
+      {
+        "id": "emi_optional",
+        "modId": "emi",
+        "displayName": "EMI",
+        "versionRange": "[1,)",
+        "dependencyType": "optional",
+        "side": "client",
+        "gradleCoordinate": "",
+        "note": "EMI 配方查看器兼容占位。",
+        "tags": [
+          "recipe-viewer"
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "id": "recipe_doc_card",
+        "title": "配方说明面板",
+        "description": "为机器配方生成玩家能看懂的说明、输入输出、耗时和条件。",
+        "tone": "grass",
+        "actionId": "recipe_doc_prompt",
+        "tags": [
+          "教程",
+          "配方"
+        ]
+      },
+      {
+        "id": "tag_recipe_card",
+        "title": "标签配方模板",
+        "description": "快速生成 #forge/#c 这类标签材料配方，便于跨模组兼容。",
+        "tone": "ore",
+        "actionId": "tag_recipe_blueprint",
+        "tags": [
+          "标签",
+          "兼容"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "recipe_doc_prompt",
+        "label": "生成配方查看器说明",
+        "description": "让 AI 整理当前配方在 JEI/EMI/REI 中应该如何展示。",
+        "kind": "set_ai_prompt",
+        "promptTarget": "feature",
+        "prompt": "请为当前 BlockForge 项目整理配方查看器兼容方案：列出每个自定义配方的输入、输出、耗时、经验、标签材料、说明文本、JEI/EMI/REI 展示风险和需要补充的本地化键。"
+      },
+      {
+        "id": "tag_recipe_blueprint",
+        "label": "生成标签配方",
+        "description": "创建一个使用通用标签的无序合成配方。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "tag_recipe",
+          "label": "标签兼容配方",
+          "kind": "recipe",
+          "elementId": "tagged_component_recipe",
+          "zhName": "标签兼容配方",
+          "description": "使用通用标签作为材料，减少和其它模组的冲突。",
+          "properties": {
+            "recipeType": "shapeless",
+            "category": "misc",
+            "ingredients": [
+              "#forge:ingots/iron",
+              "#forge:dusts/redstone"
+            ],
+            "result": "minecraft:comparator",
+            "count": 1
+          }
+        }
+      }
+    ],
+    "aiPrompts": [
+      {
+        "id": "recipe_cleanup",
+        "label": "配方清理",
+        "target": "project",
+        "prompt": "检查当前 BlockForge 项目的所有配方：是否使用了合适标签、结果 ID 是否存在、数量是否合理、是否适合在 JEI/EMI 中展示，并输出修正清单。",
+        "description": "用于发布前整理配方。"
+      }
+    ],
+    "docs": [
+      {
+        "id": "jei",
+        "title": "JEI GitHub",
+        "url": "https://github.com/mezz/JustEnoughItems",
+        "description": "JEI 源码与发行信息。"
+      },
+      {
+        "id": "emi",
+        "title": "EMI GitHub",
+        "url": "https://github.com/emilyploszaj/emi",
+        "description": "EMI 源码与发行信息。"
+      }
+    ]
+  }
+}

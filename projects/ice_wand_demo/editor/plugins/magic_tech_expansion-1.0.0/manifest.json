@@ -1,0 +1,117 @@
+{
+  "kind": "blockforge.plugin",
+  "schemaVersion": "0.1.0",
+  "id": "magic_tech_expansion",
+  "name": "魔法科技扩展包",
+  "version": "1.0.0",
+  "author": "BlockForge Studio",
+  "description": "为 Botania、Thermal 等常见生态准备的魔法/科技附属创作包，强调材料线、机器线、法术线和跨模组标签。",
+  "compatibleBlockForge": "0.1.0",
+  "compatibleMinecraft": [
+    "1.20.1"
+  ],
+  "compatibleLoaders": [
+    "forge"
+  ],
+  "tags": [
+    "botania",
+    "thermal",
+    "magic",
+    "technology"
+  ],
+  "safety": "declarative",
+  "contributes": {
+    "compatibilityPresets": [
+      {
+        "id": "botania_optional",
+        "modId": "botania",
+        "displayName": "Botania",
+        "versionRange": "[1.20,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "植物魔法兼容占位。",
+        "tags": [
+          "magic"
+        ]
+      },
+      {
+        "id": "thermal_optional",
+        "modId": "thermal",
+        "displayName": "Thermal Series",
+        "versionRange": "[11,)",
+        "dependencyType": "optional",
+        "side": "both",
+        "gradleCoordinate": "",
+        "note": "Thermal 系列兼容占位。",
+        "tags": [
+          "technology"
+        ]
+      }
+    ],
+    "cards": [
+      {
+        "id": "mana_material_card",
+        "title": "魔力材料",
+        "description": "生成魔力水晶/粉尘类材料草稿。",
+        "tone": "ore",
+        "actionId": "mana_material_blueprint",
+        "tags": [
+          "魔法",
+          "材料"
+        ]
+      },
+      {
+        "id": "thermal_machine_card",
+        "title": "热力机器提示",
+        "description": "规划输入、输出、能量、耗时和升级件。",
+        "tone": "redstone",
+        "actionId": "thermal_machine_prompt",
+        "tags": [
+          "科技",
+          "机器"
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "mana_material_blueprint",
+        "label": "生成魔力材料",
+        "description": "创建一个魔法材料物品。",
+        "kind": "create_element_blueprint",
+        "blueprint": {
+          "id": "mana_material",
+          "label": "魔力材料",
+          "kind": "item",
+          "elementId": "mana_infused_gear",
+          "zhName": "魔力灌注齿轮",
+          "description": "适合同时连接 Botania 魔力线与机械/科技线的中间材料。",
+          "properties": {
+            "itemKind": "generic",
+            "maxStackSize": 64,
+            "rarity": "rare",
+            "texture": "mana_infused_gear",
+            "creativeTab": "ingredients"
+          }
+        }
+      },
+      {
+        "id": "thermal_machine_prompt",
+        "label": "规划热力机器",
+        "description": "让 AI 设计一个 Thermal 风格机器玩法。",
+        "kind": "set_ai_prompt",
+        "promptTarget": "feature",
+        "prompt": "设计一个 Thermal 风格的机器附属功能：能量输入、材料输入、产物输出、耗时、升级槽、GUI、贴图、模型、配方和节点事件。"
+      }
+    ],
+    "aiPrompts": [
+      {
+        "id": "magic_tech_bridge",
+        "label": "魔法科技联动",
+        "target": "feature",
+        "prompt": "设计一个把 Botania 魔力材料与 Thermal/Create 机械加工连接起来的附属模组玩法，输出元素清单、配方、节点逻辑和生成步骤。",
+        "description": "用于跨模组附属设计。"
+      }
+    ]
+  }
+}

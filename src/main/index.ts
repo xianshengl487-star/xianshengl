@@ -12,6 +12,7 @@ import {
   createMobEffect,
   createPotion,
   createRecipe,
+  createStructure,
   createTool,
   deleteElement,
   duplicateElement,
@@ -251,9 +252,15 @@ async function createSampleProject(projectDir: string, primaryLoader: LoaderId =
     potion.properties.effects = [{ effect: `${project.modId}:frostbite`, duration: 160, amplifier: 1, visible: true, showIcon: true }];
     const enchantment = createEnchantment(project, 'frost_affinity', '霜寒亲和');
     enchantment.properties.slots = ['mainhand'];
+    const structure = createStructure(project, 'frost_cottage', '冰霜小屋');
+    structure.properties.wallBlock = `${project.modId}:frost_block`;
+    structure.properties.floorBlock = 'minecraft:spruce_planks';
+    structure.properties.roofBlock = 'minecraft:blue_ice';
+    structure.properties.accentBlock = 'minecraft:spruce_log';
+    structure.properties.glassBlock = 'minecraft:light_blue_stained_glass_pane';
     enchantment.properties.description = '让武器更适合触发冰霜主题逻辑。';
 
-    for (const element of [item, tool, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
+    for (const element of [item, tool, block, recipe, loot, fn, effect, potion, enchantment, structure]) await saveElement(projectDir, element);
 
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'blockforge-sample-'));
     const itemTexture = path.join(tmpDir, 'ice_wand.png');
@@ -326,6 +333,7 @@ function registerIpc() {
   ipcMain.handle('elements:createMobEffect', async (_event, input: { projectDir: string; id: string; zhName: string }) => createMobEffect(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createPotion', async (_event, input: { projectDir: string; id: string; zhName: string }) => createPotion(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createEnchantment', async (_event, input: { projectDir: string; id: string; zhName: string }) => createEnchantment(await readProject(input.projectDir), input.id, input.zhName));
+  ipcMain.handle('elements:createStructure', async (_event, input: { projectDir: string; id: string; zhName: string }) => createStructure(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:save', async (_event, input: { projectDir: string; element: ElementModel }) => {
     await saveElement(input.projectDir, input.element);
     return loadElementSet(input.projectDir);
