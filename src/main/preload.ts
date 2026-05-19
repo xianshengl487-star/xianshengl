@@ -9,6 +9,7 @@ contextBridge.exposeInMainWorld('blockforge', {
     createSample: (payload: unknown) => invoke('project:createSample', payload),
     open: (payload?: unknown) => invoke('project:open', payload),
     readRecent: () => invoke('project:readRecent'),
+    save: (payload: unknown) => invoke('project:save', payload),
     exportZip: (payload: unknown) => invoke('project:exportZip', payload)
   },
   settings: {
@@ -24,6 +25,7 @@ contextBridge.exposeInMainWorld('blockforge', {
   },
   elements: {
     createItem: (payload: unknown) => invoke('elements:createItem', payload),
+    createTool: (payload: unknown) => invoke('elements:createTool', payload),
     createBlock: (payload: unknown) => invoke('elements:createBlock', payload),
     createRecipe: (payload: unknown) => invoke('elements:createRecipe', payload),
     createLootTable: (payload: unknown) => invoke('elements:createLootTable', payload),
@@ -108,10 +110,21 @@ contextBridge.exposeInMainWorld('blockforge', {
     import: (payload: unknown) => invoke('templates:import', payload),
     list: (payload: unknown) => invoke('templates:list', payload)
   },
+  plugins: {
+    catalog: () => invoke('plugins:catalog'),
+    list: (payload: unknown) => invoke('plugins:list', payload),
+    import: (payload: unknown) => invoke('plugins:import', payload),
+    installBuiltin: (payload: unknown) => invoke('plugins:installBuiltin', payload),
+    toggle: (payload: unknown) => invoke('plugins:toggle', payload),
+    remove: (payload: unknown) => invoke('plugins:remove', payload),
+    createStarter: (payload: unknown) => invoke('plugins:createStarter', payload),
+    export: (payload: unknown) => invoke('plugins:export', payload)
+  },
   privacy: {
     scan: () => invoke('privacy:scan')
   },
   system: {
-    openPath: (payload: unknown) => invoke('system:openPath', payload)
+    openPath: (payload: unknown) => invoke('system:openPath', payload),
+    openExternal: (payload: unknown) => invoke('system:openExternal', payload)
   }
 });

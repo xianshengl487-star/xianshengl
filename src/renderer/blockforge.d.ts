@@ -4,6 +4,7 @@ import type { ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
 import type { BlockForgeIR, LogicGraph, LogicNode } from '../shared/types/logic';
 import type { UiScreenModel } from '../shared/types/ui';
+import type { BlockForgePluginManifest, InstalledPlugin } from '../shared/types/plugins';
 
 type SnapshotInfo = {
   id: string;
@@ -34,6 +35,7 @@ type InstalledTemplate = {
 type ProjectOpenResult = { projectDir: string; project: ProjectModel } | null;
 type ElementSet = {
   items: ElementModel[];
+  tools: ElementModel[];
   blocks: ElementModel[];
   recipes: ElementModel[];
   lootTables: ElementModel[];
@@ -97,6 +99,7 @@ declare global {
         createSample(payload: { projectDir: string; primaryLoader?: LoaderId }): Promise<ProjectOpenResult>;
         open(payload?: { projectDir?: string }): Promise<ProjectOpenResult>;
         readRecent(): Promise<string[]>;
+        save(payload: { projectDir: string; project: ProjectModel }): Promise<ProjectModel>;
         exportZip(payload: { projectDir: string; outputFile?: string }): Promise<string>;
       };
       settings: {
@@ -108,6 +111,7 @@ declare global {
       };
       elements: {
         createItem(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
+        createTool(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createBlock(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createRecipe(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
         createLootTable(payload: { projectDir: string; id: string; zhName: string }): Promise<ElementModel>;
@@ -188,11 +192,22 @@ declare global {
         import(payload: { projectDir: string; sourceFile?: string }): Promise<InstalledTemplate | null>;
         list(payload: { projectDir: string }): Promise<InstalledTemplate[]>;
       };
+      plugins: {
+        catalog(): Promise<BlockForgePluginManifest[]>;
+        list(payload: { projectDir: string }): Promise<InstalledPlugin[]>;
+        import(payload: { projectDir: string; sourceFile?: string }): Promise<InstalledPlugin | null>;
+        installBuiltin(payload: { projectDir: string; pluginId: string }): Promise<InstalledPlugin>;
+        toggle(payload: { projectDir: string; pluginId: string; enabled: boolean }): Promise<InstalledPlugin[]>;
+        remove(payload: { projectDir: string; pluginId: string }): Promise<InstalledPlugin[]>;
+        createStarter(payload: { projectDir: string; name?: string }): Promise<string>;
+        export(payload: { projectDir: string; pluginId: string; outputFile?: string }): Promise<string | null>;
+      };
       privacy: {
         scan(): Promise<PrivacyScanResult>;
       };
       system: {
         openPath(payload: { targetPath: string }): Promise<boolean>;
+        openExternal(payload: { url: string }): Promise<boolean>;
       };
     };
   }

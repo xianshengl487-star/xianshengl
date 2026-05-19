@@ -128,6 +128,16 @@ function actionToJava(step: IRStep, variables: LogicVariable[]): string {
   if (step.kind === 'spawn_particle') return `BlockForgeGameActions.spawnParticle(level, player.position(), ${stringExpr(step.args.particle || 'minecraft:enchanted_hit', variables)}, Math.max(1, (int) (${numberExpr(step.args.count, variables, 16)})));`;
   if (step.kind === 'set_block') return `BlockForgeGameActions.setBlock(level, player.blockPosition().below(), ${stringExpr(step.args.block || 'minecraft:ice', variables)});`;
   if (step.kind === 'summon_entity') return `BlockForgeGameActions.summonEntity(level, player.blockPosition(), ${stringExpr(step.args.entityType || 'minecraft:snow_golem', variables)}, Math.max(1, (int) (${numberExpr(step.args.count, variables, 1)})));`;
+  if (step.kind === 'set_time') return `level.setDayTime(Math.max(0L, (long) (${numberExpr(step.args.time, variables, 6000)})));`;
+  if (step.kind === 'teleport_entity') return `player.teleportTo(level, ${numberExpr(step.args.x, variables, 0)}, ${numberExpr(step.args.y, variables, 80)}, ${numberExpr(step.args.z, variables, 0)}, player.getYRot(), player.getXRot());`;
+  if (step.kind === 'give_xp') return `player.giveExperiencePoints(Math.max(0, (int) (${numberExpr(step.args.amount, variables, 5)})));`;
+  if (step.kind === 'shoot_projectile') return `BlockForgeGameActions.shootProjectile(level, player, ${stringExpr(step.args.projectile || 'minecraft:arrow', variables)}, Math.max(1, (int) (${numberExpr(step.args.count, variables, 1)})), Math.max(0.1f, (float) (${numberExpr(step.args.damage, variables, 5)})), Math.max(0.1f, (float) (${numberExpr(step.args.velocity, variables, 3.5)})), Math.max(0f, (float) (${numberExpr(step.args.spread, variables, 1.2)})));`;
+  if (step.kind === 'set_variable_text') {
+    return variable ? `${javaIdentifier(variable.id)} = ${stringExpr(step.args.value, variables)};` : '// TODO variable not found';
+  }
+  if (step.kind === 'append_to_list') {
+    return variable ? `${javaIdentifier(variable.id)} = ${javaIdentifier(variable.id)} + "\\n" + ${stringExpr(step.args.value, variables)};` : '// TODO variable not found';
+  }
   return `// TODO unsupported action: ${step.kind}`;
 }
 
@@ -176,9 +186,33 @@ function handlerSetup(eventType: string) {
       setup: '        if (!(event.getEntity() instanceof Player player)) return;\n        Level level = (Level) event.getLevel();\n        BlockPos bfBlockPos = event.getPos();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
     };
   }
+  if (eventType === 'item_use') {
+    return {
+      eventClass: 'PlayerInteractEvent.RightClickItem',
+      setup: '        Player player = event.getEntity();\n        Level level = event.getLevel();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = event.getItemStack();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'item_crafted') {
+    return {
+      eventClass: 'PlayerEvent.ItemCraftedEvent',
+      setup: '        Player player = event.getEntity();\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = event.getCrafting();\n        if (level.isClientSide) return;\n'
+    };
+  }
   if (eventType === 'player_join') {
     return {
       eventClass: 'PlayerEvent.PlayerLoggedInEvent',
+      setup: '        Player player = event.getEntity();\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'player_respawn') {
+    return {
+      eventClass: 'PlayerEvent.PlayerRespawnEvent',
+      setup: '        Player player = event.getEntity();\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'player_attack') {
+    return {
+      eventClass: 'AttackEntityEvent',
       setup: '        Player player = event.getEntity();\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
     };
   }
@@ -200,6 +234,18 @@ function handlerSetup(eventType: string) {
       setup: '        if (!(event.getSource().getEntity() instanceof Player player)) return;\n        Level level = player.level();\n        BlockPos bfBlockPos = event.getEntity().blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
     };
   }
+  if (eventType === 'entity_spawn') {
+    return {
+      eventClass: 'EntityJoinLevelEvent',
+      setup: '        if (!(event.getEntity() instanceof Player player)) return;\n        Level level = player.level();\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n        if (level.isClientSide) return;\n'
+    };
+  }
+  if (eventType === 'world_load') {
+    return {
+      eventClass: 'LevelEvent.Load',
+      setup: '        Level level = event.getLevel();\n        if (level.isClientSide) return;\n        Player player = level.players().isEmpty() ? null : level.players().get(0);\n        if (player == null) return;\n        BlockPos bfBlockPos = player.blockPosition();\n        ItemStack bfItemStack = player.getMainHandItem();\n'
+    };
+  }
   if (eventType === 'world_tick') {
     return {
       eventClass: 'TickEvent.LevelTickEvent',
@@ -215,11 +261,13 @@ function handlerSetup(eventType: string) {
 export function generateForgeEventHandler(packageName: string, ir: BlockForgeIR): string {
   const eventType = ir.event.type || 'item_right_click';
   const context = handlerSetup(eventType);
-  const target = ir.event.target?.startsWith('item:') ? ir.event.target.split(':')[1] : undefined;
+  const target = ir.event.target?.startsWith('item:') || ir.event.target?.startsWith('tool:')
+    ? ir.event.target.split(':')[1]
+    : undefined;
   const targetGuard = target ? `        if (!bfItemStack.is(${packageName}.registry.ModItems.${constantName(target)}.get())) return;\n` : '';
   const variables = ir.variables || [];
   const variableCode = variables.length ? `${variables.map(variableDeclaration).join('\n')}\n` : '';
-  return `package ${packageName}.logic;\n\nimport net.minecraftforge.event.entity.player.PlayerInteractEvent;\nimport net.minecraftforge.event.entity.player.PlayerEvent;\nimport net.minecraftforge.event.entity.living.LivingHurtEvent;\nimport net.minecraftforge.event.entity.living.LivingDeathEvent;\nimport net.minecraftforge.event.level.BlockEvent;\nimport net.minecraftforge.event.TickEvent;\nimport net.minecraftforge.eventbus.api.SubscribeEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.level.Level;\n\n@Mod.EventBusSubscriber\npublic class GeneratedEventHandlers {\n    @SubscribeEvent\n    public static void ${eventMethodName(eventType)}(${context.eventClass} event) {\n${context.setup}${targetGuard}${variableCode}${ir.steps.map(step => stepToJava(step, variables)).join('\n')}\n    }\n}\n`;
+  return `package ${packageName}.logic;\n\nimport net.minecraftforge.event.entity.player.PlayerInteractEvent;\nimport net.minecraftforge.event.entity.player.PlayerEvent;\nimport net.minecraftforge.event.entity.player.AttackEntityEvent;\nimport net.minecraftforge.event.entity.EntityJoinLevelEvent;\nimport net.minecraftforge.event.entity.living.LivingHurtEvent;\nimport net.minecraftforge.event.entity.living.LivingDeathEvent;\nimport net.minecraftforge.event.level.BlockEvent;\nimport net.minecraftforge.event.level.LevelEvent;\nimport net.minecraftforge.event.TickEvent;\nimport net.minecraftforge.eventbus.api.SubscribeEvent;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.level.Level;\n\n@Mod.EventBusSubscriber\npublic class GeneratedEventHandlers {\n    @SubscribeEvent\n    public static void ${eventMethodName(eventType)}(${context.eventClass} event) {\n${context.setup}${targetGuard}${variableCode}${ir.steps.map(step => stepToJava(step, variables)).join('\n')}\n    }\n}\n`;
 }
 
 export function generateCooldowns(packageName: string): string {
@@ -231,5 +279,5 @@ export function generateItemUtils(packageName: string): string {
 }
 
 export function generateGameActions(packageName: string): string {
-  return `package ${packageName}.logic;\n\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.core.particles.ParticleTypes;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.server.level.ServerLevel;\nimport net.minecraft.sounds.SoundSource;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.entity.EntityType;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.level.Level;\nimport net.minecraftforge.registries.ForgeRegistries;\n\npublic class BlockForgeGameActions {\n    public static void giveItem(Player player, String itemId, int count) {\n        var item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemId));\n        if (item != null) player.addItem(new ItemStack(item, count));\n    }\n\n    public static void giveEffect(Player player, String effectId, int seconds, int amplifier) {\n        var effect = ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation(effectId));\n        if (effect != null) player.addEffect(new MobEffectInstance(effect, seconds * 20, amplifier));\n    }\n\n    public static void playSound(Level level, BlockPos pos, String soundId, float volume, float pitch) {\n        var sound = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation(soundId));\n        if (sound != null) level.playSound(null, pos, sound, SoundSource.PLAYERS, volume, pitch);\n    }\n\n    public static void spawnParticle(Level level, net.minecraft.world.phys.Vec3 pos, String particleId, int count) {\n        if (level instanceof ServerLevel serverLevel) {\n            serverLevel.sendParticles(ParticleTypes.ENCHANTED_HIT, pos.x, pos.y + 1, pos.z, count, 0.4, 0.4, 0.4, 0.05);\n        }\n    }\n\n    public static void setBlock(Level level, BlockPos pos, String blockId) {\n        var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(blockId));\n        if (block != null) level.setBlock(pos, block.defaultBlockState(), 3);\n    }\n\n    public static void summonEntity(Level level, BlockPos pos, String entityId, int count) {\n        if (!(level instanceof ServerLevel serverLevel)) return;\n        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation(entityId));\n        if (type == null) return;\n        for (int i = 0; i < count; i++) {\n            var entity = type.create(serverLevel);\n            if (entity != null) {\n                entity.moveTo(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);\n                serverLevel.addFreshEntity(entity);\n            }\n        }\n    }\n\n    public static boolean isBlock(Level level, BlockPos pos, String blockId) {\n        var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(blockId));\n        return block != null && level.getBlockState(pos).is(block);\n    }\n\n    public static boolean isBiome(Level level, BlockPos pos, String biomeId) {\n        return level.getBiome(pos).unwrapKey().map(key -> key.location().equals(new ResourceLocation(biomeId))).orElse(false);\n    }\n\n    public static boolean isEntityType(net.minecraft.world.entity.Entity entity, String entityId) {\n        var key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());\n        return key != null && key.equals(new ResourceLocation(entityId));\n    }\n}\n`;
+  return `package ${packageName}.logic;\n\nimport net.minecraft.core.BlockPos;\nimport net.minecraft.core.particles.ParticleTypes;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.server.level.ServerLevel;\nimport net.minecraft.sounds.SoundSource;\nimport net.minecraft.world.effect.MobEffectInstance;\nimport net.minecraft.world.entity.EntityType;\nimport net.minecraft.world.entity.player.Player;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.level.Level;\nimport net.minecraftforge.registries.ForgeRegistries;\n\npublic class BlockForgeGameActions {\n    public static void giveItem(Player player, String itemId, int count) {\n        var item = ForgeRegistries.ITEMS.getValue(new ResourceLocation(itemId));\n        if (item != null) player.addItem(new ItemStack(item, count));\n    }\n\n    public static void giveEffect(Player player, String effectId, int seconds, int amplifier) {\n        var effect = ForgeRegistries.MOB_EFFECTS.getValue(new ResourceLocation(effectId));\n        if (effect != null) player.addEffect(new MobEffectInstance(effect, seconds * 20, amplifier));\n    }\n\n    public static void playSound(Level level, BlockPos pos, String soundId, float volume, float pitch) {\n        var sound = ForgeRegistries.SOUND_EVENTS.getValue(new ResourceLocation(soundId));\n        if (sound != null) level.playSound(null, pos, sound, SoundSource.PLAYERS, volume, pitch);\n    }\n\n    public static void spawnParticle(Level level, net.minecraft.world.phys.Vec3 pos, String particleId, int count) {\n        if (level instanceof ServerLevel serverLevel) {\n            serverLevel.sendParticles(ParticleTypes.ENCHANTED_HIT, pos.x, pos.y + 1, pos.z, count, 0.4, 0.4, 0.4, 0.05);\n        }\n    }\n\n    public static void setBlock(Level level, BlockPos pos, String blockId) {\n        var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(blockId));\n        if (block != null) level.setBlock(pos, block.defaultBlockState(), 3);\n    }\n\n    public static void summonEntity(Level level, BlockPos pos, String entityId, int count) {\n        if (!(level instanceof ServerLevel serverLevel)) return;\n        EntityType<?> type = ForgeRegistries.ENTITY_TYPES.getValue(new ResourceLocation(entityId));\n        if (type == null) return;\n        for (int i = 0; i < count; i++) {\n            var entity = type.create(serverLevel);\n            if (entity != null) {\n                entity.moveTo(pos.getX() + 0.5, pos.getY() + 1, pos.getZ() + 0.5);\n                serverLevel.addFreshEntity(entity);\n            }\n        }\n    }\n\n    public static boolean isBlock(Level level, BlockPos pos, String blockId) {\n        var block = ForgeRegistries.BLOCKS.getValue(new ResourceLocation(blockId));\n        return block != null && level.getBlockState(pos).is(block);\n    }\n\n    public static boolean isBiome(Level level, BlockPos pos, String biomeId) {\n        return level.getBiome(pos).unwrapKey().map(key -> key.location().equals(new ResourceLocation(biomeId))).orElse(false);\n    }\n\n    public static boolean isEntityType(net.minecraft.world.entity.Entity entity, String entityId) {\n        var key = ForgeRegistries.ENTITY_TYPES.getKey(entity.getType());\n        return key != null && key.equals(new ResourceLocation(entityId));\n    }\n\n    public static void shootProjectile(Level level, Player player, String projectileId, int count, float damage, float velocity, float spread) {\n        if (!(level instanceof ServerLevel serverLevel)) return;\n        for (int i = 0; i < count; i++) {\n            net.minecraft.world.entity.projectile.Arrow arrow = new net.minecraft.world.entity.projectile.Arrow(serverLevel, player);\n            arrow.setBaseDamage(damage);\n            arrow.shootFromRotation(player, player.getXRot(), player.getYRot(), 0.0F, velocity, spread);\n            arrow.setPos(player.getX(), player.getEyeY() - 0.1, player.getZ());\n            serverLevel.addFreshEntity(arrow);\n        }\n    }\n}\n`;
 }

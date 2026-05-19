@@ -435,7 +435,7 @@ export function buildProjectChangePrompt(userPrompt: string, projectFiles: Array
         'Return exactly one JSON object and nothing else.',
         'The JSON object must be a project_change_plan:',
         '{"type":"project_change_plan","title":"short title","summary":"what will change","riskLevel":"low|medium|high","files":[{"path":"editor/elements/items/example.json","action":"create_or_replace","content":"full file content as UTF-8 string","reason":"why"}],"nextSteps":["generate Forge","build jar"]}.',
-        'You may only propose changes to paths that already appear in projectFiles, or new files under editor/elements, editor/logic, editor/resources, editor/ui, editor/variables, editor/templates, src/custom, or blockforge.project.json.',
+        'You may only propose changes to paths that already appear in projectFiles, or new files under editor/elements, editor/logic, editor/resources, editor/ui, editor/variables, editor/templates, editor/plugins, src/custom, or blockforge.project.json.',
         'Never include generated/forge, exports, logs, node_modules, dist, package files, or absolute paths.',
         'For JSON files, content must be complete valid JSON text, not a diff.',
         'For mcfunction files, content must be complete function text.',

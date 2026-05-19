@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import type { ProjectModel } from '../../../shared/types/project';
-import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement } from '../../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement, ToolElement } from '../../../shared/types/elements';
 import type { BlockForgeIR } from '../../../shared/types/logic';
 import { copyResourcesToGenerated } from '../../resources/resourceService';
 import { generateCooldowns, generateForgeEventHandler, generateGameActions, generateItemUtils } from './forgeEventGenerator';
+
+type ItemLikeElement = ItemElement | ToolElement;
 
 function javaPackagePath(pkg: string): string { return pkg.replace(/\./g, '/'); }
 function className(id: string): string { return id.split('_').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(''); }
@@ -16,7 +18,7 @@ async function writeJson(file: string, value: unknown) { await write(file, `${JS
 export interface ForgeGenerateInput {
   projectDir: string;
   project: ProjectModel;
-  items: ItemElement[];
+  items: ItemLikeElement[];
   blocks: BlockElement[];
   recipes?: RecipeElement[];
   lootTables?: LootTableElement[];
@@ -44,6 +46,31 @@ function intOr(value: unknown, fallback: number): number {
   return Math.round(numberOr(value, fallback));
 }
 
+function compatibilityEntries(project: ProjectModel) {
+  return Array.isArray(project.compatibility?.externalMods) ? project.compatibility.externalMods.filter(entry => entry.modId) : [];
+}
+
+function forgeDependencyLine(entry: { dependencyType: string; gradleCoordinate: string }): string {
+  if (!entry.gradleCoordinate) return '';
+  if (entry.dependencyType === 'runtimeOnly') return `    runtimeOnly fg.deobf("${entry.gradleCoordinate}")`;
+  if (entry.dependencyType === 'compileOnly' || entry.dependencyType === 'optional') return `    compileOnly fg.deobf("${entry.gradleCoordinate}")`;
+  return `    implementation fg.deobf("${entry.gradleCoordinate}")`;
+}
+
+function modTomlDependencyBlock(project: ProjectModel): string {
+  const entries = compatibilityEntries(project);
+  if (entries.length === 0) return '';
+  return entries.map(entry => `[[dependencies.${project.modId}]]\nmodId="${entry.modId}"\nmandatory=${entry.dependencyType === 'required'}\nversionRange="${entry.versionRange || '[0,)'}"\nordering="NONE"\nside="${entry.side === 'client' ? 'CLIENT' : entry.side === 'server' ? 'SERVER' : 'BOTH'}"\n`).join('\n');
+}
+
+function compatibilityReadme(project: ProjectModel): string {
+  const entries = compatibilityEntries(project);
+  if (entries.length === 0) {
+    return `# ${project.displayName} Compatibility\n\n暂无外部模组依赖。\n`;
+  }
+  return `# ${project.displayName} Compatibility\n\n${entries.map(entry => `- ${entry.displayName || entry.modId} (${entry.modId})\n  - 类型: ${entry.dependencyType}\n  - 范围: ${entry.versionRange || '[0,)'}\n  - 侧: ${entry.side}\n  - 坐标: ${entry.gradleCoordinate || '未填写'}\n  - 备注: ${entry.note || '无'}`).join('\n')}\n`;
+}
+
 function javaFloat(value: number): string {
   return `${Number(value.toFixed(3))}f`;
 }
@@ -54,29 +81,34 @@ function itemTierCode(tier: string | undefined): string {
   return allowed.has(normalized) ? `Tiers.${normalized}` : 'Tiers.IRON';
 }
 
-function isDurableItem(item: ItemElement): boolean {
+function isDurableItem(item: ItemLikeElement): boolean {
   const kind = item.properties.itemKind || 'generic';
-  return kind === 'magic_wand' || kind.startsWith('weapon_') || kind.startsWith('tool_') || numberOr(item.properties.durability, 0) > 0;
+  return kind === 'magic_wand' || kind.startsWith('weapon_') || kind.startsWith('tool_') || kind.startsWith('armor_') || numberOr(item.properties.durability, 0) > 0;
 }
 
-function itemPropertiesCode(item: ItemElement): string {
+function itemPropertiesCode(item: ItemLikeElement): string {
   const props = item.properties;
   const durable = isDurableItem(item);
   const stackSize = durable ? 1 : Math.max(1, Math.min(64, intOr(props.maxStackSize, 64)));
   const durability = durable ? Math.max(1, intOr(props.durability, 250)) : 0;
   let code = `new Item.Properties().stacksTo(${stackSize})`;
   if (durability > 0) code += `.durability(${durability})`;
+  if (props.rarity) code += `.rarity(Rarity.${String(props.rarity).toUpperCase()})`;
   if (props.fireResistant) code += '.fireResistant()';
+  if (props.canRepair === false) code += '.setNoRepair()';
+  if (props.useDuration !== undefined) code += `.useDuration(${Math.max(1, intOr(props.useDuration, 32))})`;
+  if (props.useAnimation && props.useAnimation !== 'none') code += `.useAnimation(UseAnim.${String(props.useAnimation).toUpperCase()})`;
   if (props.itemKind === 'food') {
     const nutrition = Math.max(0, intOr(props.foodNutrition, 4));
     const saturation = Math.max(0, numberOr(props.foodSaturation, 0.3));
     const alwaysEat = props.alwaysEat ? '.alwaysEat()' : '';
-    code += `.food(new FoodProperties.Builder().nutrition(${nutrition}).saturationMod(${javaFloat(saturation)})${alwaysEat}.build())`;
+    const meat = props.foodIsMeat ? '.meat()' : '';
+    code += `.food(new FoodProperties.Builder().nutrition(${nutrition}).saturationMod(${javaFloat(saturation)})${meat}${alwaysEat}.build())`;
   }
   return code;
 }
 
-function itemFactoryCode(item: ItemElement): string {
+function itemFactoryCode(item: ItemLikeElement): string {
   const props = item.properties;
   const kind = props.itemKind || 'generic';
   const tier = itemTierCode(props.tier);
@@ -85,6 +117,17 @@ function itemFactoryCode(item: ItemElement): string {
   const attackSpeed = numberOr(props.attackSpeed, kind.includes('axe') ? -3.1 : -2.4);
   if (kind === 'weapon_sword') return `new SwordItem(${tier}, ${intOr(attackDamage, 4)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'weapon_axe' || kind === 'tool_axe') return `new AxeItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_bow') return `new BowItem(${itemProps})`;
+  if (kind === 'weapon_crossbow') return `new CrossbowItem(${itemProps})`;
+  if (kind === 'weapon_pistol' || kind === 'weapon_rifle' || kind === 'weapon_shotgun' || kind === 'weapon_magic_gun') return `new CrossbowItem(${itemProps})`;
+  if (kind === 'weapon_spear') return `new net.minecraft.world.item.TridentItem(${itemProps})`;
+  if (kind === 'weapon_hammer') return `new AxeItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_dagger') return `new SwordItem(${tier}, ${intOr(attackDamage, 2)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_shield') return `new ShieldItem(${itemProps})`;
+  if (kind === 'armor_helmet') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.HELMET, ${itemProps})`;
+  if (kind === 'armor_chestplate') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.CHESTPLATE, ${itemProps})`;
+  if (kind === 'armor_leggings') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.LEGGINGS, ${itemProps})`;
+  if (kind === 'armor_boots') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.BOOTS, ${itemProps})`;
   if (kind === 'tool_pickaxe') return `new PickaxeItem(${tier}, ${intOr(attackDamage, 1)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'tool_shovel') return `new ShovelItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'tool_hoe') return `new HoeItem(${tier}, ${intOr(attackDamage, -2)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
@@ -197,6 +240,15 @@ function enchantmentFactoryCode(enchantment: EnchantmentElement): string {
         @Override public boolean isCurse() { return ${Boolean(props.curse)}; }
         @Override public boolean isDiscoverable() { return ${props.discoverable !== false}; }
     }`;
+}
+
+function forgeBuildDependencies(project: ProjectModel): string {
+  const base = [`    minecraft 'net.minecraftforge:forge:${project.minecraftVersion}-47.2.0'`];
+  for (const entry of compatibilityEntries(project)) {
+    const line = forgeDependencyLine(entry);
+    if (line) base.push(line);
+  }
+  return base.join('\n');
 }
 
 function deployCommandsMarkdown(project: ProjectModel): string {
@@ -369,7 +421,7 @@ export async function generateForgeProject(input: ForgeGenerateInput): Promise<{
   await fs.mkdir(root, { recursive: true });
 
   await write(path.join(root, 'settings.gradle'), `pluginManagement {\n    repositories {\n        maven { name = 'Aliyun Gradle Plugin'; url = uri('https://maven.aliyun.com/repository/gradle-plugin') }\n        maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n        maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }\n        gradlePluginPortal()\n        mavenCentral()\n    }\n}\n\nrootProject.name='${project.modId}'\n`);
-  await write(path.join(root, 'build.gradle'), `plugins { id 'net.minecraftforge.gradle' version '[6.0,6.2)' }\n\ngroup='${project.packageName}'\nversion='1.0.0'\n\njava { toolchain.languageVersion = JavaLanguageVersion.of(17) }\n\ntasks.withType(JavaCompile).configureEach {\n    options.encoding = 'UTF-8'\n}\n\nminecraft { mappings channel: 'official', version: '${project.minecraftVersion}' }\n\nrepositories {\n    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n    maven { name = 'Aliyun Central'; url = uri('https://maven.aliyun.com/repository/central') }\n    maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }\n    mavenCentral()\n}\n\ndependencies { minecraft 'net.minecraftforge:forge:${project.minecraftVersion}-47.2.0' }\n\njar { manifest { attributes(['Specification-Title': '${project.modId}', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) } }\n`);
+  await write(path.join(root, 'build.gradle'), `plugins { id 'net.minecraftforge.gradle' version '[6.0,6.2)' }\n\ngroup='${project.packageName}'\nversion='1.0.0'\n\njava { toolchain.languageVersion = JavaLanguageVersion.of(17) }\n\ntasks.withType(JavaCompile).configureEach {\n    options.encoding = 'UTF-8'\n}\n\nminecraft { mappings channel: 'official', version: '${project.minecraftVersion}' }\n\nrepositories {\n    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n    maven { name = 'Aliyun Central'; url = uri('https://maven.aliyun.com/repository/central') }\n    maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }\n    mavenCentral()\n}\n\ndependencies {\n${forgeBuildDependencies(project)}\n}\n\njar { manifest { attributes(['Specification-Title': '${project.modId}', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) } }\n`);
   await write(path.join(root, 'gradle.properties'), 'org.gradle.jvmargs=-Xmx2G -Dfile.encoding=UTF-8\norg.gradle.daemon=false\n');
   await write(path.join(root, 'BLOCKFORGE_DEPLOY_COMMANDS.md'), deployCommandsMarkdown(project));
   await write(path.join(root, 'blockforge-setup-env.ps1'), setupEnvScript());
@@ -379,7 +431,7 @@ export async function generateForgeProject(input: ForgeGenerateInput): Promise<{
   const modClass = className(project.modId) + 'Mod';
   await write(path.join(pkgDir, `${modClass}.java`), `package ${project.packageName};\n\nimport com.mojang.logging.LogUtils;\nimport net.minecraftforge.fml.common.Mod;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;\nimport org.slf4j.Logger;\nimport ${project.packageName}.registry.ModItems;\nimport ${project.packageName}.registry.ModBlocks;\nimport ${project.packageName}.registry.ModCreativeTabs;\nimport ${project.packageName}.registry.ModMobEffects;\nimport ${project.packageName}.registry.ModPotions;\nimport ${project.packageName}.registry.ModEnchantments;\n\n@Mod(${modClass}.MODID)\npublic class ${modClass} {\n    public static final String MODID = "${project.modId}";\n    public static final Logger LOGGER = LogUtils.getLogger();\n\n    public ${modClass}() {\n        IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();\n        ModBlocks.register(bus);\n        ModItems.register(bus);\n        ModMobEffects.register(bus);\n        ModPotions.register(bus);\n        ModEnchantments.register(bus);\n        ModCreativeTabs.register(bus);\n    }\n}\n`);
 
-  await write(path.join(pkgDir, 'registry/ModItems.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.food.FoodProperties;\nimport net.minecraft.world.item.AxeItem;\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.item.HoeItem;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.PickaxeItem;\nimport net.minecraft.world.item.ShovelItem;\nimport net.minecraft.world.item.SwordItem;\nimport net.minecraft.world.item.Tiers;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport ${project.packageName}.${modClass};\n\npublic class ModItems {\n    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ${modClass}.MODID);\n${items.map(i => `    public static final RegistryObject<Item> ${constantName(i.id)} = ITEMS.register("${i.id}", () -> ${itemFactoryCode(i)});`).join('\n')}\n${blocks.map(b => `    public static final RegistryObject<Item> ${constantName(b.id)}_ITEM = ITEMS.register("${b.id}", () -> new BlockItem(ModBlocks.${constantName(b.id)}.get(), new Item.Properties()));`).join('\n')}\n\n    public static void register(IEventBus bus) { ITEMS.register(bus); }\n}\n`);
+  await write(path.join(pkgDir, 'registry/ModItems.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.food.FoodProperties;\nimport net.minecraft.world.item.ArmorItem;\nimport net.minecraft.world.item.ArmorMaterials;\nimport net.minecraft.world.item.AxeItem;\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.item.BowItem;\nimport net.minecraft.world.item.CrossbowItem;\nimport net.minecraft.world.item.HoeItem;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.PickaxeItem;\nimport net.minecraft.world.item.Rarity;\nimport net.minecraft.world.item.ShieldItem;\nimport net.minecraft.world.item.ShovelItem;\nimport net.minecraft.world.item.SwordItem;\nimport net.minecraft.world.item.Tiers;\nimport net.minecraft.world.item.UseAnim;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport ${project.packageName}.${modClass};\n\npublic class ModItems {\n    public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ${modClass}.MODID);\n${items.map(i => `    public static final RegistryObject<Item> ${constantName(i.id)} = ITEMS.register("${i.id}", () -> ${itemFactoryCode(i)});`).join('\\n')}\n${blocks.map(b => `    public static final RegistryObject<Item> ${constantName(b.id)}_ITEM = ITEMS.register("${b.id}", () -> new BlockItem(ModBlocks.${constantName(b.id)}.get(), new Item.Properties()));`).join('\\n')}\n\n    public static void register(IEventBus bus) { ITEMS.register(bus); }\n}\n`);
 
   await write(path.join(pkgDir, 'registry/ModBlocks.java'), `package ${project.packageName}.registry;\n\nimport net.minecraft.world.level.block.Block;\nimport net.minecraft.world.level.block.SoundType;\nimport net.minecraft.world.level.block.state.BlockBehaviour;\nimport net.minecraft.world.level.material.MapColor;\nimport net.minecraftforge.registries.DeferredRegister;\nimport net.minecraftforge.registries.ForgeRegistries;\nimport net.minecraftforge.registries.RegistryObject;\nimport net.minecraftforge.eventbus.api.IEventBus;\nimport ${project.packageName}.${modClass};\n\npublic class ModBlocks {\n    public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(ForgeRegistries.BLOCKS, ${modClass}.MODID);\n${blocks.map(b => `    public static final RegistryObject<Block> ${constantName(b.id)} = BLOCKS.register("${b.id}", () -> new Block(${blockPropertiesCode(b)}));`).join('\n')}\n\n    public static void register(IEventBus bus) { BLOCKS.register(bus); }\n}\n`);
 
@@ -401,7 +453,8 @@ export async function generateForgeProject(input: ForgeGenerateInput): Promise<{
     }
   }
 
-  await write(path.join(resDir, 'META-INF/mods.toml'), `modLoader="javafml"\nloaderVersion="[47,)"\nlicense="${project.license}"\n[[mods]]\nmodId="${project.modId}"\nversion="1.0.0"\ndisplayName="${project.displayName}"\nauthors="${project.author}"\ndescription='''${project.description}'''\n`);
+  await write(path.join(resDir, 'META-INF/mods.toml'), `modLoader="javafml"\nloaderVersion="[47,)"\nlicense="${project.license}"\n[[mods]]\nmodId="${project.modId}"\nversion="1.0.0"\ndisplayName="${project.displayName}"\nauthors="${project.author}"\ndescription='''${project.description}'''\n${modTomlDependencyBlock(project)}`);
+  await write(path.join(root, 'BLOCKFORGE_COMPATIBILITY.md'), compatibilityReadme(project));
   await writeJson(path.join(resDir, 'pack.mcmeta'), { pack: { pack_format: 15, description: project.displayName } });
 
   const zh: Record<string, string> = { [`itemGroup.${project.modId}`]: project.displayName };

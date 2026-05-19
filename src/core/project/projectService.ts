@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { createDefaultProject, type LoaderId, type ProjectModel } from '../../shared/types/project';
+import { createDefaultProject, type LoaderId, type ModCompatibilityEntry, type ProjectModel } from '../../shared/types/project';
 
 export function toModId(input: string): string {
   const normalized = input.trim().toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
@@ -32,6 +32,7 @@ export const projectDirs = [
   'editor/resources/lang',
   'editor/resources/functions',
   'editor/templates',
+  'editor/plugins',
   'editor/ai',
   'editor/snapshots',
   'generated/forge',
@@ -50,6 +51,26 @@ export interface CreateProjectOptions {
   author?: string;
   description?: string;
   primaryLoader?: LoaderId;
+}
+
+function normalizeCompatibility(entries: unknown): ModCompatibilityEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries.map(entry => {
+    const value = entry as Partial<ModCompatibilityEntry>;
+    const dependencyType = String(value.dependencyType || 'required');
+    const side = String(value.side || 'both');
+    return {
+      modId: String(value.modId || '').trim(),
+      displayName: String(value.displayName || '').trim(),
+      versionRange: String(value.versionRange || '[0,)').trim(),
+      dependencyType: ['required', 'optional', 'compileOnly', 'runtimeOnly'].includes(dependencyType)
+        ? dependencyType as ModCompatibilityEntry['dependencyType']
+        : 'required',
+      side: ['both', 'client', 'server'].includes(side) ? side as ModCompatibilityEntry['side'] : 'both',
+      gradleCoordinate: String(value.gradleCoordinate || '').trim(),
+      note: String(value.note || '').trim()
+    };
+  }).filter(entry => entry.modId.length > 0);
 }
 
 export async function ensureProjectStructure(baseDir: string): Promise<void> {
@@ -78,13 +99,30 @@ export async function readProject(projectDir: string): Promise<ProjectModel> {
   return {
     ...createDefaultProject(parsed.displayName || 'BlockForge Project', parsed.modId || path.basename(projectDir), primaryLoader),
     ...parsed,
+    compatibility: {
+      externalMods: normalizeCompatibility(parsed.compatibility?.externalMods),
+      acceptedNamespaces: Array.isArray(parsed.compatibility?.acceptedNamespaces)
+        ? parsed.compatibility.acceptedNamespaces.map(item => String(item).trim()).filter(Boolean)
+        : [],
+      allowExternalTags: parsed.compatibility?.allowExternalTags !== false
+    },
     targetLoaders: parsed.targetLoaders?.length ? parsed.targetLoaders : [primaryLoader],
     primaryLoader
   } as ProjectModel;
 }
 
 export async function writeProject(projectDir: string, project: ProjectModel): Promise<void> {
-  const next = { ...project, updatedAt: new Date().toISOString() };
+  const next = {
+    ...project,
+    compatibility: {
+      externalMods: normalizeCompatibility(project.compatibility?.externalMods),
+      acceptedNamespaces: Array.isArray(project.compatibility?.acceptedNamespaces)
+        ? project.compatibility.acceptedNamespaces.map(item => String(item).trim()).filter(Boolean)
+        : [],
+      allowExternalTags: project.compatibility?.allowExternalTags !== false
+    },
+    updatedAt: new Date().toISOString()
+  };
   await ensureProjectStructure(projectDir);
   await fs.writeFile(path.join(projectDir, 'blockforge.project.json'), JSON.stringify(next, null, 2), 'utf8');
   await fs.writeFile(path.join(projectDir, 'editor/project.json'), JSON.stringify(next, null, 2), 'utf8');

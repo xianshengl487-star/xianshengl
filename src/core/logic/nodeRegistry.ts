@@ -35,9 +35,15 @@ export const nodeDefinitions: Record<string, NodeDefinition> = {
   'event.player_tick': event('事件：玩家每刻更新'),
   'event.player_join': event('事件：玩家进入世界'),
   'event.player_hurt': event('事件：玩家受到伤害'),
+  'event.player_respawn': event('事件：玩家重生'),
+  'event.player_attack': event('事件：玩家攻击实体'),
   'event.living_death': event('事件：实体死亡'),
+  'event.entity_spawn': event('事件：实体生成'),
   'event.block_break': event('事件：破坏方块'),
   'event.block_place': event('事件：放置方块'),
+  'event.item_use': event('事件：使用物品'),
+  'event.item_crafted': event('事件：合成物品'),
+  'event.world_load': event('事件：世界加载'),
   'event.world_tick': event('事件：世界每刻更新'),
 
   'condition.player_xp_level_at_least': condition('判断：经验等级至少为', { level: 10 }, ['level']),
@@ -68,7 +74,13 @@ export const nodeDefinitions: Record<string, NodeDefinition> = {
   'action.play_sound': action('游戏：播放音效', { sound: 'minecraft:block.amethyst_block.chime', volume: 1, pitch: 1 }, ['sound']),
   'action.spawn_particle': action('游戏：生成粒子', { particle: 'minecraft:enchanted_hit', count: 16 }, ['particle']),
   'action.set_block': action('世界：设置脚下方块', { block: 'minecraft:ice' }, ['block']),
-  'action.summon_entity': action('世界：召唤实体', { entityType: 'minecraft:snow_golem', count: 1 }, ['entityType'])
+  'action.summon_entity': action('世界：召唤实体', { entityType: 'minecraft:snow_golem', count: 1 }, ['entityType']),
+  'action.set_time': action('世界：设置时间', { time: 6000 }, ['time']),
+  'action.teleport_entity': action('世界：传送实体', { target: 'self', x: 0, y: 80, z: 0 }, ['x', 'y', 'z']),
+  'action.give_xp': action('玩家：给予经验', { amount: 5 }, ['amount']),
+  'action.set_variable_text': action('变量：设置文本', { variable: '', value: 'BlockForge' }, ['variable']),
+  'action.append_to_list': action('变量：追加列表文本', { variable: '', value: 'entry' }, ['variable']),
+  'action.shoot_projectile': action('世界：发射弹丸', { projectile: 'minecraft:arrow', damage: 5, velocity: 3.5, spread: 1.2, count: 1 }, ['projectile'])
 };
 
 export function createNode(nodeType: string): LogicNode {

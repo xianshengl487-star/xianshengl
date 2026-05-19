@@ -9,7 +9,8 @@ import type {
   LootTableElement,
   MobEffectElement,
   PotionElement,
-  RecipeElement
+  RecipeElement,
+  ToolElement
 } from '../../shared/types/elements';
 import type { ProjectModel } from '../../shared/types/project';
 
@@ -43,13 +44,56 @@ export function createItem(project: ProjectModel, id: string, zhName: string): I
     properties: {
       itemKind: 'generic',
       maxStackSize: 64,
+      rarity: 'common',
       tier: 'IRON',
       attackDamage: 4,
       attackSpeed: -2.4,
+      useDuration: 32,
+      useAnimation: 'none',
+      enchantmentValue: 1,
+      canRepair: true,
+      ammoItem: '',
+      ammoPerShot: 1,
+      magazineSize: 1,
+      reloadTicks: 20,
+      projectileDamage: 2,
+      projectileSpeed: 3,
+      projectileSpread: 1,
+      shotCount: 1,
       foodNutrition: 4,
       foodSaturation: 0.3,
+      foodIsMeat: false,
       alwaysEat: false,
       fireResistant: false,
+      creativeTab: `${project.modId}_tab`,
+      model: ''
+    },
+  };
+}
+
+export function createTool(project: ProjectModel, id: string, zhName: string): ToolElement {
+  return {
+    ...baseElement(project, id, zhName),
+    type: 'tool',
+    properties: {
+      itemKind: 'tool_pickaxe',
+      maxStackSize: 1,
+      rarity: 'uncommon',
+      tier: 'IRON',
+      attackDamage: 1,
+      attackSpeed: -2.8,
+      useDuration: 32,
+      useAnimation: 'none',
+      enchantmentValue: 2,
+      canRepair: true,
+      ammoItem: '',
+      ammoPerShot: 1,
+      magazineSize: 1,
+      reloadTicks: 20,
+      projectileDamage: 2,
+      projectileSpeed: 3,
+      projectileSpread: 1,
+      shotCount: 1,
       creativeTab: `${project.modId}_tab`,
       model: ''
     },
@@ -153,6 +197,7 @@ export function createFunctionElement(project: ProjectModel, id: string, zhName:
 export function folderForElementType(type: ElementModel['type']): string {
   if (type === 'block') return 'blocks';
   if (type === 'item') return 'items';
+  if (type === 'tool') return 'tools';
   if (type === 'recipe') return 'recipes';
   if (type === 'loot_table') return 'loot_tables';
   if (type === 'function') return 'functions';
@@ -226,8 +271,9 @@ export async function loadElements<T extends ElementModel<unknown>>(projectDir: 
 }
 
 export async function loadElementSet(projectDir: string) {
-  const [items, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments] = await Promise.all([
+  const [items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments] = await Promise.all([
     loadElements<ItemElement>(projectDir, 'items'),
+    loadElements<ToolElement>(projectDir, 'tools'),
     loadElements<BlockElement>(projectDir, 'blocks'),
     loadElements<RecipeElement>(projectDir, 'recipes'),
     loadElements<LootTableElement>(projectDir, 'loot_tables'),
@@ -236,5 +282,5 @@ export async function loadElementSet(projectDir: string) {
     loadElements<PotionElement>(projectDir, 'potions'),
     loadElements<EnchantmentElement>(projectDir, 'enchantments')
   ]);
-  return { items, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments };
+  return { items, tools, blocks, recipes, lootTables, functions, mobEffects, potions, enchantments };
 }

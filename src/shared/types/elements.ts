@@ -40,6 +40,20 @@ export type ItemKind =
   | 'magic_wand'
   | 'weapon_sword'
   | 'weapon_axe'
+  | 'weapon_bow'
+  | 'weapon_crossbow'
+  | 'weapon_shield'
+  | 'weapon_pistol'
+  | 'weapon_rifle'
+  | 'weapon_shotgun'
+  | 'weapon_magic_gun'
+  | 'weapon_spear'
+  | 'weapon_hammer'
+  | 'weapon_dagger'
+  | 'armor_helmet'
+  | 'armor_chestplate'
+  | 'armor_leggings'
+  | 'armor_boots'
   | 'tool_pickaxe'
   | 'tool_axe'
   | 'tool_shovel'
@@ -47,16 +61,32 @@ export type ItemKind =
   | 'food';
 
 export type ToolTier = 'WOOD' | 'STONE' | 'IRON' | 'GOLD' | 'DIAMOND' | 'NETHERITE';
+export type ItemRarity = 'common' | 'uncommon' | 'rare' | 'epic';
+export type ItemUseAnimation = 'none' | 'eat' | 'drink' | 'block' | 'bow' | 'spear' | 'crossbow';
 
 export interface ItemProperties {
   itemKind: ItemKind;
   maxStackSize: number;
   durability?: number;
   tier?: ToolTier;
+  rarity?: ItemRarity;
   attackDamage?: number;
   attackSpeed?: number;
+  useDuration?: number;
+  useAnimation?: ItemUseAnimation;
+  enchantmentValue?: number;
+  canRepair?: boolean;
+  ammoItem?: string;
+  ammoPerShot?: number;
+  magazineSize?: number;
+  reloadTicks?: number;
+  projectileDamage?: number;
+  projectileSpeed?: number;
+  projectileSpread?: number;
+  shotCount?: number;
   foodNutrition?: number;
   foodSaturation?: number;
+  foodIsMeat?: boolean;
   alwaysEat?: boolean;
   fireResistant?: boolean;
   creativeTab: string;
@@ -151,6 +181,7 @@ export interface FunctionProperties {
 }
 
 export type ItemElement = ElementModel<ItemProperties> & { type: 'item' };
+export type ToolElement = ElementModel<ItemProperties> & { type: 'tool' };
 export type BlockElement = ElementModel<BlockProperties> & { type: 'block' };
 export type RecipeElement = ElementModel<RecipeProperties> & { type: 'recipe' };
 export type LootTableElement = ElementModel<LootTableProperties> & { type: 'loot_table' };

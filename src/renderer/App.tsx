@@ -2,21 +2,23 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, ReactNode } from 'react';
 import { deepSeekPreset, lmStudioPreset, mimoPreset, ollamaPreset } from '../shared/types/ai';
 import type { AiChatMessage, AiModelDraft, AiModFeatureDraft, AiProjectChangePlan, AiProviderConfig, AiTextureDraft } from '../shared/types/ai';
-import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
+import type { Diagnostic, ElementModel, EnchantmentRarity, EnchantmentSlot, ItemKind, ItemRarity, ItemUseAnimation, MobEffectCategory, PotionEffectSpec, PotionKind, RecipeType, ToolTier } from '../shared/types/elements';
 import type { BlockForgeIR, LogicEdge, LogicGraph, LogicNode, LogicVariable, LogicVariableType, PortType } from '../shared/types/logic';
-import { loaderDeployFolder, loaderDisplayName, loaderOutputFolder, loaderShortName, type LoaderId, type ProjectModel } from '../shared/types/project';
+import { loaderDeployFolder, loaderDisplayName, loaderOutputFolder, loaderShortName, type LoaderId, type ModCompatibilityEntry, type ProjectModel } from '../shared/types/project';
 import type { ResourceIndex, ResourceItem } from '../shared/types/resources';
 import type { UiScreenModel, UiWidget, UiWidgetType } from '../shared/types/ui';
+import type { BlockForgePluginManifest, InstalledPlugin, PluginAction, PluginAiPrompt, PluginElementBlueprint, PluginWorkbenchCard } from '../shared/types/plugins';
 
-type ViewId = 'home' | 'design' | 'elements' | 'resources' | 'logic' | 'ui' | 'forge' | 'ai' | 'manage' | 'settings';
+type ViewId = 'home' | 'design' | 'elements' | 'resources' | 'logic' | 'ui' | 'forge' | 'ai' | 'plugins' | 'manage' | 'settings';
 type BottomId = 'logs' | 'diagnostics' | 'ir' | 'code' | 'ai';
-type ElementKind = 'item' | 'block' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment';
+type ElementKind = 'item' | 'tool' | 'block' | 'recipe' | 'loot_table' | 'function' | 'mob_effect' | 'potion' | 'enchantment';
 type TextureTool = 'pencil' | 'eraser' | 'fill' | 'eyedropper';
 type TextureSize = 16 | 32 | 64;
 type ModelUsage = 'item_model' | 'block_model';
 
 type ElementSet = {
   items: ElementModel[];
+  tools: ElementModel[];
   blocks: ElementModel[];
   recipes: ElementModel[];
   lootTables: ElementModel[];
@@ -50,6 +52,12 @@ type InstalledTemplate = {
   installedPath: string;
   installedAt: string;
 };
+
+type PluginActionRuntime = PluginAction & { pluginId: string; pluginName: string };
+type PluginCardRuntime = PluginWorkbenchCard & { pluginId: string; pluginName: string };
+type PluginPromptRuntime = PluginAiPrompt & { pluginId: string; pluginName: string };
+type PluginBlueprintRuntime = PluginElementBlueprint & { pluginId: string; pluginName: string };
+type PluginRuntime = InstalledPlugin;
 
 type AppSettings = {
   autoBuildAfterGenerate: boolean;
@@ -190,9 +198,10 @@ const api = window.blockforge;
 const textureEditorMode = new URLSearchParams(window.location.search).get('textureEditor') === '1';
 const modelEditorMode = new URLSearchParams(window.location.search).get('modelEditor') === '1';
 const initialProjectDir = new URLSearchParams(window.location.search).get('projectDir') || 'E:\\MCMOD\\projects\\ice_wand_demo';
-const emptyElements: ElementSet = { items: [], blocks: [], recipes: [], lootTables: [], functions: [], mobEffects: [], potions: [], enchantments: [] };
+const emptyElements: ElementSet = { items: [], tools: [], blocks: [], recipes: [], lootTables: [], functions: [], mobEffects: [], potions: [], enchantments: [] };
 const kindLabels: Record<ElementKind, string> = {
   item: '物品',
+  tool: '工具',
   block: '方块',
   recipe: '配方',
   loot_table: '战利品表',
@@ -206,11 +215,40 @@ const itemKindLabels: Record<ItemKind, string> = {
   magic_wand: '法杖 / 特殊右键物品',
   weapon_sword: '武器：剑',
   weapon_axe: '武器：斧',
+  weapon_bow: '武器：弓',
+  weapon_crossbow: '武器：弩',
+  weapon_pistol: '武器：手枪',
+  weapon_rifle: '武器：步枪',
+  weapon_shotgun: '武器：霰弹枪',
+  weapon_magic_gun: '武器：魔能枪',
+  weapon_spear: '武器：长枪',
+  weapon_hammer: '武器：战锤',
+  weapon_dagger: '武器：匕首',
+  weapon_shield: '武器：盾',
+  armor_helmet: '护甲：头盔',
+  armor_chestplate: '护甲：胸甲',
+  armor_leggings: '护甲：护腿',
+  armor_boots: '护甲：靴子',
   tool_pickaxe: '工具：镐',
   tool_axe: '工具：斧',
   tool_shovel: '工具：铲',
   tool_hoe: '工具：锄',
   food: '食物'
+};
+const itemRarityLabels: Record<ItemRarity, string> = {
+  common: '普通',
+  uncommon: '罕见',
+  rare: '稀有',
+  epic: '史诗'
+};
+const itemUseAnimationLabels: Record<ItemUseAnimation, string> = {
+  none: '无',
+  eat: '进食',
+  drink: '饮用',
+  block: '格挡',
+  bow: '拉弓',
+  spear: '投掷',
+  crossbow: '装填弩'
 };
 const mobEffectCategoryLabels: Record<MobEffectCategory, string> = {
   beneficial: '增益',
@@ -243,6 +281,24 @@ const recipeTypeLabels: Record<RecipeType, string> = {
   shaped: '有序合成',
   smelting: '熔炉烧炼'
 };
+type CompatibilityPreset = {
+  modId: string;
+  displayName: string;
+  versionRange: string;
+  dependencyType: ModCompatibilityEntry['dependencyType'];
+  side: ModCompatibilityEntry['side'];
+  gradleCoordinate: string;
+  note: string;
+};
+const compatibilityPresets: CompatibilityPreset[] = [
+  { modId: 'jei', displayName: 'Just Enough Items', versionRange: '[15,)', dependencyType: 'optional', side: 'client', gradleCoordinate: '', note: '配方展示、材料查询和玩家查阅入口。' },
+  { modId: 'jade', displayName: 'Jade', versionRange: '[11,)', dependencyType: 'optional', side: 'client', gradleCoordinate: '', note: '方块/实体信息提示兼容。' },
+  { modId: 'curios', displayName: 'Curios API', versionRange: '[5,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '饰品槽、装备扩展和特殊物品栏。' },
+  { modId: 'create', displayName: 'Create', versionRange: '[0.5,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '机械动力、转轴、动力方块和材料联动。' },
+  { modId: 'geckolib', displayName: 'GeckoLib', versionRange: '[4,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '实体、方块和物品动画扩展。' },
+  { modId: 'patchouli', displayName: 'Patchouli', versionRange: '[84,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '内置手册、教程书和多页说明。' },
+  { modId: 'architectury', displayName: 'Architectury API', versionRange: '[9,)', dependencyType: 'optional', side: 'both', gradleCoordinate: '', note: '多加载器公共 API 兼容层。' }
+];
 const variableTypeLabels: Record<LogicVariableType, string> = {
   number: '数字',
   string: '文本',
@@ -257,6 +313,7 @@ const viewLabels: Record<ViewId, string> = {
   ui: 'GUI 容器',
   forge: '工程输出',
   ai: 'AI 助手',
+  plugins: '插件工坊',
   manage: '存档管理',
   settings: '设置/教程'
 };
@@ -283,14 +340,16 @@ const itemTierLabels: Record<ToolTier, string> = {
   NETHERITE: '下界合金'
 };
 const eventNodeGroups = [
-  { title: '玩家事件', nodes: [['event.player_join', '进入世界'], ['event.player_tick', '玩家每刻'], ['event.player_hurt', '受到伤害']] },
-  { title: '物品/方块事件', nodes: [['event.item_right_click', '右键物品'], ['event.block_right_click', '右键方块'], ['event.block_break', '破坏方块'], ['event.block_place', '放置方块']] },
-  { title: '实体/世界事件', nodes: [['event.living_death', '实体死亡'], ['event.world_tick', '世界每刻']] }
+  { title: '玩家事件', nodes: [['event.player_join', '进入世界'], ['event.player_tick', '玩家每刻'], ['event.player_hurt', '受到伤害'], ['event.player_respawn', '重生'], ['event.player_attack', '攻击实体']] },
+  { title: '物品/方块事件', nodes: [['event.item_right_click', '右键物品'], ['event.item_use', '使用物品'], ['event.item_crafted', '合成物品'], ['event.block_right_click', '右键方块'], ['event.block_break', '破坏方块'], ['event.block_place', '放置方块']] },
+  { title: '实体/世界事件', nodes: [['event.living_death', '实体死亡'], ['event.entity_spawn', '实体生成'], ['event.world_load', '世界加载'], ['event.world_tick', '世界每刻']] }
 ] as const;
 const gameNodeGroups = [
-  { title: '玩家动作', nodes: [['action.send_message', '发消息'], ['action.give_item', '给予物品'], ['action.give_effect', '给予效果'], ['action.consume_xp_level', '消耗经验']] },
-  { title: '世界动作', nodes: [['action.play_sound', '播放音效'], ['action.spawn_particle', '生成粒子'], ['action.set_block', '设置方块'], ['action.summon_entity', '召唤实体']] },
-  { title: '游戏判断', nodes: [['condition.player_has_item', '拥有物品'], ['condition.block_is', '脚下方块'], ['condition.biome_is', '所在群系'], ['condition.entity_type_is', '实体类型']] }
+  { title: '玩家动作', nodes: [['action.send_message', '发消息'], ['action.give_item', '给予物品'], ['action.give_effect', '给予效果'], ['action.consume_xp_level', '消耗经验'], ['action.consume_item', '消耗物品'], ['action.give_xp', '给予经验']] },
+  { title: '世界动作', nodes: [['action.play_sound', '播放音效'], ['action.spawn_particle', '生成粒子'], ['action.set_block', '设置方块'], ['action.summon_entity', '召唤实体'], ['action.execute_command', '执行命令'], ['action.set_time', '设置时间'], ['action.teleport_entity', '传送实体'], ['action.shoot_projectile', '发射弹丸']] },
+  { title: '游戏判断', nodes: [['condition.player_has_item', '拥有物品'], ['condition.player_xp_level_at_least', '经验达到'], ['condition.cooldown_ready', '冷却完成'], ['condition.block_is', '脚下方块'], ['condition.biome_is', '所在群系'], ['condition.entity_type_is', '实体类型']] },
+  { title: '变量 / NBT', nodes: [['condition.variable_equals', '变量等于'], ['condition.variable_greater_or_equal', '变量大于等于'], ['condition.nbt_has_key', 'NBT 存在'], ['condition.nbt_string_equals', 'NBT 文本等于'], ['condition.nbt_number_gte', 'NBT 数字大于等于'], ['action.variable_set', '设置变量'], ['action.variable_add', '增加变量'], ['action.set_variable_text', '设置文本变量'], ['action.append_to_list', '追加文本列表'], ['action.nbt_set_string', '写入 NBT 文本'], ['action.nbt_set_number', '写入 NBT 数字'], ['action.nbt_set_boolean', '写入 NBT 布尔'], ['action.nbt_remove', '删除 NBT']] },
+  { title: '经验与状态', nodes: [['action.give_xp', '给予经验'], ['action.give_effect', '给予效果'], ['action.consume_xp_level', '消耗经验']] }
 ] as const;
 const defaultAiPermissions: AiPermissions = {
   chat: true,
@@ -424,15 +483,47 @@ function formatVariableReferenceForParam(key: string, current: unknown, variable
 }
 
 function itemKindDefaults(kind: ItemKind): Record<string, unknown> {
-  if (kind === 'magic_wand') return { itemKind: kind, maxStackSize: 1, durability: 128, tier: 'DIAMOND', attackDamage: 4, attackSpeed: -2.2 };
-  if (kind === 'weapon_sword') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: 3, attackSpeed: -2.4 };
-  if (kind === 'weapon_axe') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: 6, attackSpeed: -3.1 };
-  if (kind === 'tool_pickaxe') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: 1, attackSpeed: -2.8 };
-  if (kind === 'tool_axe') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: 6, attackSpeed: -3.1 };
-  if (kind === 'tool_shovel') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: 1.5, attackSpeed: -3 };
-  if (kind === 'tool_hoe') return { itemKind: kind, maxStackSize: 1, durability: 250, tier: 'IRON', attackDamage: -2, attackSpeed: -1 };
-  if (kind === 'food') return { itemKind: kind, maxStackSize: 64, durability: undefined, foodNutrition: 4, foodSaturation: 0.3, alwaysEat: false };
-  return { itemKind: kind, maxStackSize: 64, durability: undefined, tier: undefined, attackDamage: undefined, attackSpeed: undefined };
+  const base = {
+    itemKind: kind,
+    maxStackSize: 64,
+    durability: undefined,
+    tier: undefined,
+    rarity: 'common',
+    attackDamage: undefined,
+    attackSpeed: undefined,
+    useDuration: 32,
+    useAnimation: 'none',
+    enchantmentValue: 1,
+    canRepair: true,
+    ammoItem: '',
+    ammoPerShot: 1,
+    magazineSize: 1,
+    reloadTicks: 20,
+    projectileDamage: 2,
+    projectileSpeed: 3,
+    projectileSpread: 1,
+    shotCount: 1
+  };
+  if (kind === 'magic_wand') return { ...base, maxStackSize: 1, durability: 128, tier: 'DIAMOND', rarity: 'rare', attackDamage: 4, attackSpeed: -2.2, useDuration: 24, useAnimation: 'spear', enchantmentValue: 18 };
+  if (kind === 'weapon_sword') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 3, attackSpeed: -2.4, useAnimation: 'block', enchantmentValue: 14 };
+  if (kind === 'weapon_axe') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 6, attackSpeed: -3.1, useAnimation: 'block', enchantmentValue: 14 };
+  if (kind === 'weapon_bow') return { ...base, maxStackSize: 1, durability: 384, tier: 'IRON', rarity: 'rare', attackDamage: 2, attackSpeed: -2.8, useDuration: 72000, useAnimation: 'bow', enchantmentValue: 1 };
+  if (kind === 'weapon_crossbow') return { ...base, maxStackSize: 1, durability: 465, tier: 'IRON', rarity: 'rare', attackDamage: 2, attackSpeed: -3, useDuration: 72000, useAnimation: 'crossbow', enchantmentValue: 1 };
+  if (kind === 'weapon_pistol') return { ...base, maxStackSize: 1, durability: 200, tier: 'IRON', rarity: 'rare', attackDamage: 6, attackSpeed: -2.5, useDuration: 20, useAnimation: 'crossbow', enchantmentValue: 1, ammoItem: 'minecraft:arrow', ammoPerShot: 1, magazineSize: 6, reloadTicks: 20, projectileDamage: 6, projectileSpeed: 4.5, projectileSpread: 0.8, shotCount: 1 };
+  if (kind === 'weapon_rifle') return { ...base, maxStackSize: 1, durability: 320, tier: 'IRON', rarity: 'rare', attackDamage: 8, attackSpeed: -2.9, useDuration: 20, useAnimation: 'crossbow', enchantmentValue: 1, ammoItem: 'minecraft:arrow', ammoPerShot: 1, magazineSize: 12, reloadTicks: 30, projectileDamage: 8, projectileSpeed: 5.5, projectileSpread: 0.2, shotCount: 1 };
+  if (kind === 'weapon_shotgun') return { ...base, maxStackSize: 1, durability: 280, tier: 'IRON', rarity: 'epic', attackDamage: 4, attackSpeed: -3, useDuration: 20, useAnimation: 'crossbow', enchantmentValue: 1, ammoItem: 'minecraft:arrow', ammoPerShot: 1, magazineSize: 4, reloadTicks: 35, projectileDamage: 4, projectileSpeed: 3.5, projectileSpread: 2.5, shotCount: 5 };
+  if (kind === 'weapon_magic_gun') return { ...base, maxStackSize: 1, durability: 500, tier: 'DIAMOND', rarity: 'epic', attackDamage: 10, attackSpeed: -2.8, useDuration: 20, useAnimation: 'crossbow', enchantmentValue: 18, ammoItem: 'minecraft:ender_pearl', ammoPerShot: 1, magazineSize: 8, reloadTicks: 25, projectileDamage: 10, projectileSpeed: 6, projectileSpread: 0.1, shotCount: 1 };
+  if (kind === 'weapon_spear') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 5, attackSpeed: -2.9, useDuration: 72000, useAnimation: 'spear', enchantmentValue: 14 };
+  if (kind === 'weapon_hammer') return { ...base, maxStackSize: 1, durability: 450, tier: 'IRON', rarity: 'rare', attackDamage: 9, attackSpeed: -3.5, useAnimation: 'block', enchantmentValue: 12 };
+  if (kind === 'weapon_dagger') return { ...base, maxStackSize: 1, durability: 150, tier: 'IRON', rarity: 'uncommon', attackDamage: 2, attackSpeed: -1.2, useAnimation: 'none', enchantmentValue: 10 };
+  if (kind === 'weapon_shield') return { ...base, maxStackSize: 1, durability: 336, tier: 'IRON', rarity: 'uncommon', attackDamage: 0, attackSpeed: -3, useDuration: 72000, useAnimation: 'block', enchantmentValue: 1 };
+  if (kind === 'armor_helmet' || kind === 'armor_chestplate' || kind === 'armor_leggings' || kind === 'armor_boots') return { ...base, maxStackSize: 1, durability: 200, tier: 'IRON', rarity: 'rare', attackDamage: 0, attackSpeed: 0, useAnimation: 'none', enchantmentValue: 9 };
+  if (kind === 'tool_pickaxe') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 1, attackSpeed: -2.8, useAnimation: 'none', enchantmentValue: 12 };
+  if (kind === 'tool_axe') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 6, attackSpeed: -3.1, useAnimation: 'none', enchantmentValue: 12 };
+  if (kind === 'tool_shovel') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: 1.5, attackSpeed: -3, useAnimation: 'none', enchantmentValue: 12 };
+  if (kind === 'tool_hoe') return { ...base, maxStackSize: 1, durability: 250, tier: 'IRON', rarity: 'uncommon', attackDamage: -2, attackSpeed: -1, useAnimation: 'none', enchantmentValue: 12 };
+  if (kind === 'food') return { ...base, maxStackSize: 64, durability: undefined, rarity: 'common', foodNutrition: 4, foodSaturation: 0.3, foodIsMeat: false, alwaysEat: false, useAnimation: 'eat', useDuration: 32 };
+  return base;
 }
 
 function formatRecipePattern(value: unknown) {
@@ -565,6 +656,23 @@ function projectDeployFolder(project: ProjectModel | null): string {
   return project ? loaderDeployFolder(project.primaryLoader) : 'mods';
 }
 
+function deploymentCommandsText(projectDir: string, project: ProjectModel | null): string {
+  if (!project) return '先创建或打开项目，再生成工程。';
+  const root = projectGeneratedRoot(project);
+  return `输出文件：
+${projectDir}\\generated\\${root}\\BLOCKFORGE_DEPLOY_COMMANDS.md
+${projectDir}\\generated\\${root}\\blockforge-setup-env.ps1
+${projectDir}\\generated\\${root}\\blockforge-check-env.ps1
+${projectDir}\\generated\\${root}\\blockforge-deploy-local.ps1
+
+常用命令：
+cd ${projectDir}\\generated\\${root}
+powershell -ExecutionPolicy Bypass -File .\\blockforge-check-env.ps1
+powershell -ExecutionPolicy Bypass -File .\\blockforge-deploy-local.ps1 -Build
+
+部署目标：${projectDeployFolder(project)}`;
+}
+
 export default function App() {
   const [activeView, setActiveView] = useState<ViewId>(textureEditorMode || modelEditorMode ? 'resources' : 'home');
   const [bottomTab, setBottomTab] = useState<BottomId>('logs');
@@ -576,6 +684,8 @@ export default function App() {
   const [resources, setResources] = useState<ResourceIndex>({ schemaVersion: '0.1.0', resources: [] });
   const [snapshots, setSnapshots] = useState<SnapshotInfo[]>([]);
   const [templates, setTemplates] = useState<InstalledTemplate[]>([]);
+  const [plugins, setPlugins] = useState<PluginRuntime[]>([]);
+  const [pluginCatalog, setPluginCatalog] = useState<BlockForgePluginManifest[]>([]);
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [logs, setLogs] = useState(nowLine('BlockForge Studio 已就绪。'));
   const [statusMessage, setStatusMessage] = useState('就绪');
@@ -599,6 +709,13 @@ export default function App() {
   const [packageName, setPackageName] = useState('com.blockforge.ice_wand_demo');
   const [author, setAuthor] = useState('player');
   const [projectLoader, setProjectLoader] = useState<LoaderId>('forge');
+  const [compatModId, setCompatModId] = useState('');
+  const [compatDisplayName, setCompatDisplayName] = useState('');
+  const [compatVersionRange, setCompatVersionRange] = useState('[0,)');
+  const [compatDependencyType, setCompatDependencyType] = useState<ModCompatibilityEntry['dependencyType']>('required');
+  const [compatSide, setCompatSide] = useState<ModCompatibilityEntry['side']>('both');
+  const [compatGradleCoordinate, setCompatGradleCoordinate] = useState('');
+  const [compatNote, setCompatNote] = useState('');
 
   const [elementKind, setElementKind] = useState<ElementKind>('item');
   const [elementId, setElementId] = useState('ice_wand');
@@ -626,6 +743,8 @@ export default function App() {
   const [modelDraftLoaded, setModelDraftLoaded] = useState(false);
   const [resourceMenu, setResourceMenu] = useState<ResourceContextMenu>(null);
   const [templatePath, setTemplatePath] = useState('');
+  const [pluginPath, setPluginPath] = useState('');
+  const [pluginStarterName, setPluginStarterName] = useState('my_plugin');
 
   const [graphs, setGraphs] = useState<LogicGraph[]>([]);
   const [currentGraph, setCurrentGraph] = useState<LogicGraph | null>(null);
@@ -668,6 +787,7 @@ export default function App() {
 
   const allElements = useMemo(() => [
     ...elements.items,
+    ...elements.tools,
     ...elements.blocks,
     ...elements.recipes,
     ...elements.lootTables,
@@ -692,10 +812,11 @@ export default function App() {
     resources: resources.resources.length,
     graphs: graphs.length,
     screens: uiScreens.length,
+    plugins: plugins.filter(plugin => plugin.enabled).length,
     completed: appSettings.completedProjects.some(item => item.projectDir === projectDir)
-  }), [allElements.length, appSettings.completedProjects, graphs.length, projectDir, resources.resources.length, uiScreens.length]);
+  }), [allElements.length, appSettings.completedProjects, graphs.length, plugins, projectDir, resources.resources.length, uiScreens.length]);
   const missingTextureElements = useMemo(() => allElements.filter(element => {
-    if (element.type === 'item') return !(element.properties as { texture?: string; model?: string }).texture && !(element.properties as { model?: string }).model;
+    if (element.type === 'item' || element.type === 'tool') return !(element.properties as { texture?: string; model?: string }).texture && !(element.properties as { model?: string }).model;
     if (element.type === 'block') return !(element.properties as { textureAll?: string; model?: string }).textureAll && !(element.properties as { model?: string }).model;
     return false;
   }), [allElements]);
@@ -719,6 +840,16 @@ export default function App() {
       elementName: '奥术法杖',
       view: 'elements',
       tone: 'ore'
+    },
+    {
+      id: 'tool_line',
+      title: '工具武器线',
+      subtitle: '适合剑、斧、镐、铲、锄等更细的装备起点。',
+      elementKind: 'tool',
+      elementId: 'frost_pickaxe',
+      elementName: '霜冻工具',
+      view: 'elements',
+      tone: 'stone'
     },
     {
       id: 'machine_line',
@@ -816,7 +947,7 @@ export default function App() {
         title: '元素系统',
         status: projectStats.elements > 0 ? 'active' : project ? 'todo' : 'blocked',
         progress: Math.min(100, projectStats.elements * 18),
-        summary: `物品 ${elements.items.length}、方块 ${elements.blocks.length}、配方 ${elements.recipes.length}、战利品表 ${elements.lootTables.length}、函数 ${elements.functions.length}`,
+        summary: `物品 ${elements.items.length}、工具 ${elements.tools.length}、方块 ${elements.blocks.length}、配方 ${elements.recipes.length}、战利品表 ${elements.lootTables.length}、函数 ${elements.functions.length}`,
         nextAction: projectStats.elements > 0 ? '继续细化属性和说明' : '至少创建一个物品或方块',
         view: 'elements'
       },
@@ -848,6 +979,15 @@ export default function App() {
         view: 'ui'
       },
       {
+        id: 'plugins',
+        title: '插件扩展',
+        status: projectStats.plugins > 0 ? 'active' : project ? 'todo' : 'blocked',
+        progress: Math.min(100, projectStats.plugins * 36),
+        summary: `已有 ${projectStats.plugins} 个已启用插件；可以贡献卡片、元素蓝图、AI 提示和文档。`,
+        nextAction: projectStats.plugins > 0 ? '继续安装或编写插件包' : '先安装一个内置插件或导入插件包',
+        view: 'plugins'
+      },
+      {
         id: 'forge',
         title: '生成与构建',
         status: hasProjectOutput ? 'active' : project ? 'todo' : 'blocked',
@@ -866,7 +1006,7 @@ export default function App() {
         view: 'ai'
       }
     ];
-  }, [aiChatMessages.length, aiConfig.displayName, aiConfig.model, aiConfig.provider, aiProjectPlan, codePreview.length, diagnostics, elements.blocks.length, elements.functions.length, elements.items.length, elements.lootTables.length, elements.recipes.length, project, projectStats.elements, projectStats.graphs, projectStats.resources, projectStats.screens]);
+  }, [aiChatMessages.length, aiConfig.displayName, aiConfig.model, aiConfig.provider, aiProjectPlan, codePreview.length, diagnostics, elements.blocks.length, elements.functions.length, elements.items.length, elements.tools.length, elements.lootTables.length, elements.recipes.length, project, projectStats.elements, projectStats.graphs, projectStats.plugins, projectStats.resources, projectStats.screens]);
   const designScore = useMemo(() => {
     if (designModules.length === 0) return 0;
     return Math.round(designModules.reduce((sum, item) => sum + item.progress, 0) / designModules.length);
@@ -876,6 +1016,11 @@ export default function App() {
     if (designTasks.length === 0) return 0;
     return Math.round((designTasks.filter(task => task.done).length / designTasks.length) * 100);
   }, [designTasks]);
+  const pluginCards = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.cards || []).map(card => ({ ...card, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
+  const pluginActions = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.actions || []).map(action => ({ ...action, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
+  const pluginPrompts = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.aiPrompts || []).map(prompt => ({ ...prompt, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
+  const pluginBlueprints = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.elementBlueprints || []).map(blueprint => ({ ...blueprint, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
+  const pluginDocs = useMemo(() => plugins.filter(plugin => plugin.enabled).flatMap(plugin => (plugin.manifest.contributes.docs || []).map(doc => ({ ...doc, pluginId: plugin.manifest.id, pluginName: plugin.manifest.name }))), [plugins]);
 
   const canUseBridge = Boolean(api);
   const selectedLogicNode = currentGraph?.nodes.find(node => node.nodeId === selectedNodeId) || null;
@@ -920,6 +1065,7 @@ export default function App() {
     setResources(await api.resources.readIndex({ projectDir: dir }));
     setSnapshots(await api.snapshots.list({ projectDir: dir }));
     setTemplates(await api.templates.list({ projectDir: dir }));
+    setPlugins(await api.plugins.list({ projectDir: dir }));
     const loadedScreens = await api.ui.load({ projectDir: dir });
     setUiScreens(loadedScreens);
     if (loadedScreens.length > 0) setCurrentUiScreen(loadedScreens[0]);
@@ -950,6 +1096,7 @@ export default function App() {
   useEffect(() => {
     if (!api) return;
     void api.project.readRecent().then(setRecent);
+    void api.plugins.catalog().then(setPluginCatalog).catch(() => undefined);
     void api.logic.nodeTypes().then(types => {
       setNodeTypes(types);
       setSelectedNodeType(types.find(type => type.startsWith('action.')) || types[0] || '');
@@ -1029,6 +1176,7 @@ export default function App() {
       'view:ai': () => setActiveView('ai'),
       'view:logic': () => setActiveView('logic'),
       'view:ui': () => setActiveView('ui'),
+      'view:plugins': () => setActiveView('plugins'),
       'view:manage': () => setActiveView('manage'),
       'view:settings': () => setActiveView('settings')
     };
@@ -1065,6 +1213,7 @@ export default function App() {
       const payload = { projectDir, id: elementId, zhName: elementName };
       const creator = {
         item: api.elements.createItem,
+        tool: api.elements.createTool,
         block: api.elements.createBlock,
         recipe: api.elements.createRecipe,
         loot_table: api.elements.createLootTable,
@@ -1209,11 +1358,11 @@ export default function App() {
   async function bindTextureToElement(name: string) {
     if (!api || !project) return;
     const [ownerType, ownerId] = textureOwner.split(':');
-    if (!ownerId || (ownerType !== 'item' && ownerType !== 'block')) return;
-    const pool = ownerType === 'item' ? elements.items : elements.blocks;
+    if (!ownerId || (ownerType !== 'item' && ownerType !== 'tool' && ownerType !== 'block')) return;
+    const pool = ownerType === 'block' ? elements.blocks : ownerType === 'tool' ? elements.tools : elements.items;
     const element = pool.find(item => item.id === ownerId);
     if (!element) return;
-    const propName = ownerType === 'item' ? 'texture' : 'textureAll';
+    const propName = ownerType === 'block' ? 'textureAll' : 'texture';
     const next = {
       ...element,
       properties: { ...(element.properties as Record<string, unknown>), [propName]: name }
@@ -1229,8 +1378,8 @@ export default function App() {
   async function bindModelToElement(name: string) {
     if (!api || !project) return;
     const [ownerType, ownerId] = modelOwner.split(':');
-    if (!ownerId || (ownerType !== 'item' && ownerType !== 'block')) return;
-    const pool = ownerType === 'item' ? elements.items : elements.blocks;
+    if (!ownerId || (ownerType !== 'item' && ownerType !== 'tool' && ownerType !== 'block')) return;
+    const pool = ownerType === 'block' ? elements.blocks : ownerType === 'tool' ? elements.tools : elements.items;
     const element = pool.find(item => item.id === ownerId);
     if (!element) return;
     const next = {
@@ -1757,6 +1906,70 @@ export default function App() {
     await saveAppSettings(next);
   }
 
+  async function saveCurrentProject(nextProject: ProjectModel) {
+    if (!api || !project) return;
+    const saved = await api.project.save({ projectDir, project: nextProject });
+    setProject(saved);
+    setDisplayName(saved.displayName);
+    setModId(saved.modId);
+    setPackageName(saved.packageName);
+    setAuthor(saved.author);
+    setProjectLoader(saved.primaryLoader);
+    pushLog(`已保存项目：${saved.displayName}。`);
+  }
+
+  async function addCompatibilityEntry() {
+    if (!project || !compatModId.trim()) return;
+    const entry: ModCompatibilityEntry = {
+      modId: compatModId.trim(),
+      displayName: compatDisplayName.trim() || compatModId.trim(),
+      versionRange: compatVersionRange.trim() || '[0,)',
+      dependencyType: compatDependencyType,
+      side: compatSide,
+      gradleCoordinate: compatGradleCoordinate.trim(),
+      note: compatNote.trim()
+    };
+    const externalMods = [...(project.compatibility?.externalMods || []).filter(item => item.modId !== entry.modId), entry];
+    const nextCompatibility = {
+      externalMods,
+      acceptedNamespaces: project.compatibility?.acceptedNamespaces || [],
+      allowExternalTags: project.compatibility?.allowExternalTags !== false
+    };
+    await saveCurrentProject({ ...project, compatibility: nextCompatibility });
+    setCompatModId('');
+    setCompatDisplayName('');
+    setCompatVersionRange('[0,)');
+    setCompatDependencyType('required');
+    setCompatSide('both');
+    setCompatGradleCoordinate('');
+    setCompatNote('');
+  }
+
+  async function addCompatibilityPreset(preset: CompatibilityPreset) {
+    if (!project) return;
+    const externalMods = [...(project.compatibility?.externalMods || []).filter(item => item.modId !== preset.modId), preset];
+    const acceptedNamespaces = Array.from(new Set([...(project.compatibility?.acceptedNamespaces || []), preset.modId]));
+    await saveCurrentProject({
+      ...project,
+      compatibility: {
+        externalMods,
+        acceptedNamespaces,
+        allowExternalTags: project.compatibility?.allowExternalTags !== false
+      }
+    });
+  }
+
+  async function removeCompatibilityEntry(modIdValue: string) {
+    if (!project) return;
+    const externalMods = (project.compatibility?.externalMods || []).filter(item => item.modId !== modIdValue);
+    const nextCompatibility = {
+      externalMods,
+      acceptedNamespaces: project.compatibility?.acceptedNamespaces || [],
+      allowExternalTags: project.compatibility?.allowExternalTags !== false
+    };
+    await saveCurrentProject({ ...project, compatibility: nextCompatibility });
+  }
+
   async function markCurrentProjectCompleted() {
     await runAction('加入完成项目列表', async () => {
       if (!project) return;
@@ -1808,6 +2021,15 @@ export default function App() {
     });
   }
 
+  async function copyDeploymentCommands() {
+    await runAction('复制部署命令', async () => {
+      const text = deploymentCommandsText(projectDir, project);
+      if (!navigator.clipboard?.writeText) throw new Error('当前环境不支持剪贴板操作。');
+      await navigator.clipboard.writeText(text);
+      pushLog('部署命令已复制到剪贴板。');
+    });
+  }
+
   async function runPrivacyScan() {
     await runAction('发布前隐私检查', async () => {
       if (!api) return;
@@ -1835,6 +2057,7 @@ export default function App() {
     if (!api || !project) return;
     setSnapshots(await api.snapshots.list({ projectDir }));
     setTemplates(await api.templates.list({ projectDir }));
+    setPlugins(await api.plugins.list({ projectDir }));
   }
 
   async function createManualSnapshot() {
@@ -1867,6 +2090,154 @@ export default function App() {
     });
   }
 
+  async function refreshPlugins() {
+    if (!api || !project) return;
+    setPluginCatalog(await api.plugins.catalog());
+    setPlugins(await api.plugins.list({ projectDir }));
+  }
+
+  async function importPluginPackage() {
+    await runAction('导入插件包', async () => {
+      if (!api || !project) return;
+      const installed = await api.plugins.import({ projectDir, sourceFile: pluginPath || undefined });
+      if (installed) pushLog(`插件已安装：${installed.manifest.name} ${installed.manifest.version}。`);
+      else pushLog('插件导入已取消。');
+      await refreshPlugins();
+    });
+  }
+
+  async function installBuiltinPlugin(pluginId: string) {
+    await runAction('安装内置插件', async () => {
+      if (!api || !project) return;
+      const installed = await api.plugins.installBuiltin({ projectDir, pluginId });
+      pushLog(`内置插件已安装：${installed.manifest.name}。`);
+      await refreshPlugins();
+    });
+  }
+
+  async function togglePlugin(plugin: PluginRuntime) {
+    await runAction(plugin.enabled ? '停用插件' : '启用插件', async () => {
+      if (!api || !project) return;
+      setPlugins(await api.plugins.toggle({ projectDir, pluginId: plugin.manifest.id, enabled: !plugin.enabled }));
+      pushLog(`${plugin.enabled ? '已停用' : '已启用'}插件：${plugin.manifest.name}。`);
+    });
+  }
+
+  async function removePlugin(plugin: PluginRuntime) {
+    const ok = window.confirm(`确定移除插件 ${plugin.manifest.name} 吗？插件包会从当前项目的 editor/plugins 中移除。`);
+    if (!ok) return;
+    await runAction('移除插件', async () => {
+      if (!api || !project) return;
+      setPlugins(await api.plugins.remove({ projectDir, pluginId: plugin.manifest.id }));
+      pushLog(`插件已移除：${plugin.manifest.name}。`);
+    });
+  }
+
+  async function createPluginStarter() {
+    await runAction('生成插件模板', async () => {
+      if (!api || !project) return;
+      const target = await api.plugins.createStarter({ projectDir, name: pluginStarterName || 'my_plugin' });
+      pushLog(`插件模板已生成：${target}`);
+      await openPath(target);
+      await refreshPlugins();
+    });
+  }
+
+  async function exportPluginPackage(plugin: PluginRuntime) {
+    await runAction('导出插件包', async () => {
+      if (!api || !project) return;
+      const target = await api.plugins.export({ projectDir, pluginId: plugin.manifest.id });
+      if (target) {
+        pushLog(`插件包已导出：${target}`);
+        await openPath(target.replace(/[\\/][^\\/]+$/, ''));
+      } else {
+        pushLog('插件包导出已取消。');
+      }
+    });
+  }
+
+  function setAiPromptByPlugin(target: PluginPromptRuntime['target'] | PluginActionRuntime['promptTarget'], prompt: string) {
+    if (target === 'logic') setAiPrompt(prompt);
+    else if (target === 'texture') setAiTexturePrompt(prompt);
+    else if (target === 'model') setAiModelPrompt(prompt);
+    else if (target === 'feature') setAiFeaturePrompt(prompt);
+    else if (target === 'project') setAiProjectPrompt(prompt);
+    else setAiChatInput(prompt);
+    setActiveView('ai');
+    setBottomTab('ai');
+    pushLog('插件已写入 AI 提示，可以继续让模型生成草案。');
+  }
+
+  async function applyPluginBlueprint(blueprint: PluginBlueprintRuntime | PluginElementBlueprint) {
+    await runAction(`运行插件蓝图：${blueprint.label}`, async () => {
+      if (!api || !project) return;
+      const payload = { projectDir, id: blueprint.elementId, zhName: blueprint.zhName };
+      const creator = {
+        item: api.elements.createItem,
+        tool: api.elements.createTool,
+        block: api.elements.createBlock,
+        recipe: api.elements.createRecipe,
+        loot_table: api.elements.createLootTable,
+        function: api.elements.createFunction,
+        mob_effect: api.elements.createMobEffect,
+        potion: api.elements.createPotion,
+        enchantment: api.elements.createEnchantment
+      }[blueprint.kind];
+      const element = await creator(payload);
+      const patched = {
+        ...element,
+        description: blueprint.description || element.description,
+        properties: {
+          ...(element.properties as Record<string, unknown>),
+          ...(blueprint.properties || {})
+        }
+      } as ElementModel;
+      const saved = await api.elements.save({ projectDir, element: patched });
+      setElements(saved);
+      setDraftElement(patched);
+      setElementKind(blueprint.kind as ElementKind);
+      setElementId(blueprint.elementId);
+      setElementName(blueprint.zhName);
+      setElementJson(pretty(patched));
+      setActiveView('elements');
+      pushLog(`插件蓝图已创建元素：${blueprint.kind}:${blueprint.elementId}。`);
+    });
+  }
+
+  async function runPluginAction(action: PluginActionRuntime) {
+    if (action.kind === 'open_view') {
+      setActiveView((action.targetView || 'design') as ViewId);
+      pushLog(`插件动作：打开 ${viewLabels[(action.targetView || 'design') as ViewId] || action.targetView}。`);
+      return;
+    }
+    if (action.kind === 'set_ai_prompt') {
+      setAiPromptByPlugin(action.promptTarget || 'chat', action.prompt || action.description);
+      return;
+    }
+    if (action.kind === 'create_element_blueprint' && action.blueprint) {
+      await applyPluginBlueprint(action.blueprint);
+      return;
+    }
+    if (action.kind === 'open_external_doc' && action.url) {
+      await runAction('打开插件文档', async () => {
+        if (!api) return;
+        await api.system.openExternal({ url: action.url! });
+        pushLog(`已打开插件文档：${action.url}`);
+      });
+      return;
+    }
+    pushLog(`插件动作 ${action.label} 暂时没有可执行的声明式处理器。`);
+  }
+
+  async function runPluginCard(card: PluginCardRuntime) {
+    const action = pluginActions.find(item => item.pluginId === card.pluginId && item.id === card.actionId);
+    if (action) await runPluginAction(action);
+    else {
+      setActiveView('plugins');
+      pushLog(`插件卡片：${card.title}。请在插件工坊中查看贡献内容。`);
+    }
+  }
+
   async function createExampleLogic() {
     await runAction('创建示例节点图', async () => {
       if (!api) return;
@@ -1877,7 +2248,7 @@ export default function App() {
     });
   }
 
-  async function createLogicTemplate(template: 'spell' | 'break_drop' | 'welcome') {
+  async function createLogicTemplate(template: 'spell' | 'break_drop' | 'welcome' | 'utility') {
     await runAction('创建事件模板', async () => {
       if (!api) return;
       const makeNode = async (nodeType: string) => api.logic.createNode({ nodeType });
@@ -1980,6 +2351,49 @@ export default function App() {
             link(hasTool, 'true_out', give, 'exec_in'),
             link(give, 'exec_out', sound, 'exec_in'),
             link(hasTool, 'false_out', denied, 'exec_in')
+          ],
+          variables: [],
+          resources: [],
+          diagnostics: [],
+          generatedCodeCache: {},
+          editorView: { zoom: 1, position: { x: 0, y: 0 }, groups: [] }
+        };
+      } else if (template === 'utility') {
+        const event = await makeNode('event.item_use');
+        const hasItem = await makeNode('condition.player_has_item');
+        const effect = await makeNode('action.give_effect');
+        const sound = await makeNode('action.play_sound');
+        const message = await makeNode('action.send_message');
+
+        event.position = { x: 40, y: 120 };
+        hasItem.position = { x: 250, y: 80 };
+        effect.position = { x: 500, y: 40 };
+        sound.position = { x: 740, y: 40 };
+        message.position = { x: 980, y: 40 };
+
+        hasItem.params.item = textureOwner || 'minecraft:stick';
+        hasItem.params.count = 1;
+        effect.params.effect = 'minecraft:speed';
+        effect.params.seconds = 3;
+        effect.params.amplifier = 0;
+        sound.params.sound = 'minecraft:block.note_block.bell';
+        message.params.text = '道具已激活。';
+
+        graph = {
+          schemaVersion: '0.1.0',
+          graphId: `logic_${Date.now()}_${Math.random().toString(16).slice(2, 6)}`,
+          name: '道具使用模板',
+          eventType: 'item_use',
+          boundElement: textureOwner || 'item:ice_wand',
+          enabled: true,
+          targetLoaders: ['forge'],
+          nodes: [event, hasItem, effect, sound, message],
+          edges: [
+            link(event, 'exec_out', hasItem, 'exec_in'),
+            link(hasItem, 'true_out', effect, 'exec_in'),
+            link(effect, 'exec_out', sound, 'exec_in'),
+            link(sound, 'exec_out', message, 'exec_in'),
+            link(hasItem, 'false_out', message, 'exec_in')
           ],
           variables: [],
           resources: [],
@@ -2411,7 +2825,8 @@ export default function App() {
           elements: allElements.length,
           resources: resources.resources.length,
           graphs: graphs.length,
-          uiScreens: uiScreens.length
+          uiScreens: uiScreens.length,
+          plugins: plugins.length
         },
         permission: 'restricted'
       };
@@ -2424,6 +2839,13 @@ export default function App() {
       resourceCount: resources.resources.length,
       graphCount: graphs.length,
       uiScreenCount: uiScreens.length,
+      plugins: plugins.map(plugin => ({
+        id: plugin.manifest.id,
+        name: plugin.manifest.name,
+        enabled: plugin.enabled,
+        tags: plugin.manifest.tags,
+        actionCount: plugin.manifest.contributes.actions?.length || 0
+      })),
       diagnostics: diagnostics.slice(0, 12)
     };
   }
@@ -2679,7 +3101,9 @@ export default function App() {
           <div className="panel-title">方块工作区</div>
           <button className={activeView === 'home' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('home')}>工作台总览</button>
           <button className={activeView === 'design' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('design')}>玩法蓝图</button>
+          <button className={activeView === 'plugins' ? 'tree-item active' : 'tree-item'} onClick={() => setActiveView('plugins')}>插件工坊</button>
           <TreeGroup title={`物品 (${elements.items.length})`} items={elements.items} onPick={pickElement} />
+          <TreeGroup title={`工具 (${elements.tools.length})`} items={elements.tools} onPick={pickElement} />
           <TreeGroup title={`方块 (${elements.blocks.length})`} items={elements.blocks} onPick={pickElement} />
           <TreeGroup title={`状态效果 (${elements.mobEffects.length})`} items={elements.mobEffects} onPick={pickElement} />
           <TreeGroup title={`药水 (${elements.potions.length})`} items={elements.potions} onPick={pickElement} />
@@ -2726,7 +3150,7 @@ export default function App() {
 
         <section className="editor-area">
           <div className="tabs">
-            {(['home', 'design', 'elements', 'resources', 'logic', 'ui', 'forge', 'ai', 'manage', 'settings'] as ViewId[]).map(view => (
+            {(['home', 'design', 'elements', 'resources', 'logic', 'ui', 'forge', 'ai', 'plugins', 'manage', 'settings'] as ViewId[]).map(view => (
               <button key={view} className={activeView === view ? 'tab active' : 'tab'} onClick={() => setActiveView(view)}>
                 {viewLabels[view]}
               </button>
@@ -2817,6 +3241,7 @@ export default function App() {
                 <div className="quick-suggestion-grid">
                   <button onClick={() => { setElementKind('item'); setElementId('new_material'); setElementName('新材料'); setActiveView('elements'); }}>材料物品</button>
                   <button onClick={() => { setElementKind('item'); setElementId('magic_wand'); setElementName('魔法法杖'); setActiveView('elements'); }}>法杖物品</button>
+                  <button onClick={() => { setElementKind('tool'); setElementId('frost_pickaxe'); setElementName('霜冻工具'); setActiveView('elements'); }}>工具</button>
                   <button onClick={() => { setElementKind('block'); setElementId('machine_block'); setElementName('机器方块'); setActiveView('elements'); }}>机器方块</button>
                   <button onClick={() => { setElementKind('mob_effect'); setElementId('frostbite'); setElementName('霜寒状态'); setActiveView('elements'); }}>状态效果</button>
                   <button onClick={() => { setElementKind('potion'); setElementId('frost_potion'); setElementName('霜寒药水'); setActiveView('elements'); }}>药水</button>
@@ -2920,6 +3345,7 @@ export default function App() {
                       <div><strong>{projectStats.resources}</strong><span>资源文件</span></div>
                       <div><strong>{projectStats.graphs}</strong><span>节点图</span></div>
                       <div><strong>{projectStats.screens}</strong><span>界面模型</span></div>
+                      <div><strong>{projectStats.plugins}</strong><span>插件</span></div>
                     </div>
                     <div className="button-row wrap">
                       <button onClick={() => setActiveView('elements')}>编辑方块/物品</button>
@@ -2964,7 +3390,7 @@ export default function App() {
               </Panel>
               <Panel title="属性锻造台">
                 {!draftElement && <div className="tree-empty">先在左侧创建或选择一个元素，再像调工作台配方一样细化属性。</div>}
-                {draftElement && <ElementQuickEditor element={draftElement} onChange={(next) => { setDraftElement(next); setElementJson(pretty(next)); }} />}
+                {draftElement && <ElementQuickEditor element={draftElement} project={project} onChange={(next) => { setDraftElement(next); setElementJson(pretty(next)); }} />}
                 <details className="advanced-block">
                   <summary>高级：查看或直接编辑元素 JSON</summary>
                   <textarea className="json-editor" value={elementJson} onChange={event => setElementJson(event.target.value)} />
@@ -2987,7 +3413,10 @@ export default function App() {
                   <option value="item_texture">物品贴图</option>
                   <option value="block_texture">方块贴图</option>
                 </select>
-                <Field label="绑定元素" value={textureOwner} onChange={setTextureOwner} hint="格式为 item:物品id 或 block:方块id，例如 item:echo_crystal。" />
+                <Field label="绑定元素" value={textureOwner} onChange={value => {
+                  setTextureOwner(value);
+                  setTextureUsage(value.startsWith('block:') ? 'block_texture' : 'item_texture');
+                }} hint="格式为 item:物品id、tool:工具id 或 block:方块id，例如 item:echo_crystal。" />
                 <Field label="贴图文件名" value={textureName} onChange={value => setTextureName(value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="不用写 .png，生成时会自动放到正确目录。" />
                 <div className="button-row">
                   <button onClick={importTexture} disabled={!project || Boolean(busy)}>选择 PNG 并自动绑定</button>
@@ -3086,7 +3515,7 @@ export default function App() {
                   setModelOwner(value);
                   setModelUsage(value.startsWith('block:') ? 'block_model' : 'item_model');
                   setModelName(ownerModelName(value));
-                }} hint="格式为 item:物品id 或 block:方块id，例如 item:ice_wand。" />
+                }} hint="格式为 item:物品id、tool:工具id 或 block:方块id，例如 item:ice_wand。" />
                 <Field label="模型文件名" value={modelName} onChange={value => setModelName(value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="不用写 .json，生成时会放到 models/item 或 models/block。" />
                 <div className="button-row">
                   <button onClick={importModel} disabled={!project || Boolean(busy)}>导入 JSON 并绑定</button>
@@ -3151,9 +3580,15 @@ export default function App() {
                 <div className="event-quick-grid">
                   <button onClick={() => createEventGraph('event.block_right_click', '右键方块事件', textureOwner || 'block:machine_block')} disabled={!project || Boolean(busy)}>右键方块</button>
                   <button onClick={() => createEventGraph('event.block_place', '放置方块事件', textureOwner || 'block:machine_block')} disabled={!project || Boolean(busy)}>放置方块</button>
+                  <button onClick={() => createEventGraph('event.item_use', '使用物品事件', textureOwner || 'item:ice_wand')} disabled={!project || Boolean(busy)}>使用物品</button>
+                  <button onClick={() => createEventGraph('event.item_crafted', '合成物品事件', textureOwner || 'item:ice_wand')} disabled={!project || Boolean(busy)}>合成物品</button>
                   <button onClick={() => createEventGraph('event.player_tick', '玩家每刻事件', 'player')} disabled={!project || Boolean(busy)}>玩家每刻</button>
                   <button onClick={() => createEventGraph('event.player_hurt', '玩家受伤事件', 'player')} disabled={!project || Boolean(busy)}>玩家受伤</button>
+                  <button onClick={() => createEventGraph('event.player_respawn', '玩家重生事件', 'player')} disabled={!project || Boolean(busy)}>玩家重生</button>
+                  <button onClick={() => createEventGraph('event.player_attack', '玩家攻击事件', 'player')} disabled={!project || Boolean(busy)}>玩家攻击</button>
                   <button onClick={() => createEventGraph('event.living_death', '实体死亡事件', 'entity')} disabled={!project || Boolean(busy)}>实体死亡</button>
+                  <button onClick={() => createEventGraph('event.entity_spawn', '实体生成事件', 'entity')} disabled={!project || Boolean(busy)}>实体生成</button>
+                  <button onClick={() => createEventGraph('event.world_load', '世界加载事件', 'world')} disabled={!project || Boolean(busy)}>世界加载</button>
                   <button onClick={() => createEventGraph('event.world_tick', '世界每刻事件', 'world')} disabled={!project || Boolean(busy)}>世界每刻</button>
                 </div>
               </div>
@@ -3176,6 +3611,10 @@ export default function App() {
                   <button onClick={() => createLogicTemplate('welcome')} disabled={!project || Boolean(busy)}>
                     <strong>进入世界欢迎奖励</strong>
                     <span>欢迎消息、给予指南针、播放提示音</span>
+                  </button>
+                  <button onClick={() => createLogicTemplate('utility')} disabled={!project || Boolean(busy)}>
+                    <strong>道具使用响应</strong>
+                    <span>使用检测、给予效果、音效、提示消息</span>
                   </button>
                 </div>
               </div>
@@ -3631,11 +4070,102 @@ export default function App() {
                     actionLabel="打开 AI 助手"
                     onAction={() => setActiveView('ai')}
                   />
+                  <TutorialStep
+                    number="7"
+                    title="安装或编写插件"
+                    text="到“插件工坊”里安装内置扩展、导入插件包或生成插件模板。插件可以贡献工作台卡片、AI 提示、元素蓝图和文档链接，用来把 BlockForge 变成更像平台的工具。"
+                    actionLabel="打开插件工坊"
+                    onAction={() => setActiveView('plugins')}
+                  />
                 </div>
                 <div className="button-row wrap">
                   <button onClick={saveCurrentWork} disabled={!project || Boolean(busy)}>保存当前工作</button>
                   <button onClick={() => generateProject(true)} disabled={!project || Boolean(busy)}>一键生成并构建</button>
                 </div>
+              </Panel>
+              <Panel title="模组兼容">
+                <div className="hint">这里记录你要兼容的外部模组。填写模组 ID 后，生成器会把依赖写进 Forge/Fabric 工程文件；坐标填全后还能直接进 Gradle。</div>
+                <div className="compat-preset-grid">
+                  {compatibilityPresets.map(preset => (
+                    <button key={preset.modId} type="button" onClick={() => void addCompatibilityPreset(preset)} disabled={!project || Boolean(busy)}>
+                      <strong>{preset.displayName}</strong>
+                      <span>{preset.modId} · {preset.side === 'client' ? '客户端' : preset.side === 'server' ? '服务端' : '双端'}</span>
+                      <small>{preset.note}</small>
+                    </button>
+                  ))}
+                </div>
+                <div className="form-grid compact">
+                  <Field label="模组 ID" value={compatModId} onChange={setCompatModId} placeholder="jei" />
+                  <Field label="显示名" value={compatDisplayName} onChange={setCompatDisplayName} placeholder="Just Enough Items" />
+                  <Field label="版本范围" value={compatVersionRange} onChange={setCompatVersionRange} placeholder="[1.0,)" />
+                  <Field label="Gradle 坐标" value={compatGradleCoordinate} onChange={setCompatGradleCoordinate} placeholder="curse.maven:jei-238222:511..." />
+                  <div>
+                    <label>依赖类型</label>
+                    <select value={compatDependencyType} onChange={event => setCompatDependencyType(event.target.value as ModCompatibilityEntry['dependencyType'])}>
+                      <option value="required">必须依赖</option>
+                      <option value="optional">可选依赖</option>
+                      <option value="compileOnly">仅编译期</option>
+                      <option value="runtimeOnly">仅运行期</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label>加载侧</label>
+                    <select value={compatSide} onChange={event => setCompatSide(event.target.value as ModCompatibilityEntry['side'])}>
+                      <option value="both">客户端 + 服务端</option>
+                      <option value="client">仅客户端</option>
+                      <option value="server">仅服务端</option>
+                    </select>
+                  </div>
+                  <Field label="备注" value={compatNote} onChange={setCompatNote} placeholder="例如：需要 JEI 展示配方" />
+                </div>
+                <div className="button-row">
+                  <button onClick={addCompatibilityEntry} disabled={!project || !compatModId.trim() || Boolean(busy)}>添加兼容项</button>
+                </div>
+                <div className="list-panel">
+                  {(project?.compatibility.externalMods || []).length === 0 && <div className="tree-empty">还没有添加外部模组依赖。</div>}
+                  {(project?.compatibility.externalMods || []).map(entry => (
+                    <div className="list-row" key={entry.modId}>
+                      <div>
+                        <strong>{entry.displayName || entry.modId}</strong>
+                        <span>{entry.modId} · {entry.dependencyType} · {entry.side} · {entry.versionRange}</span>
+                        <small>{entry.gradleCoordinate || '未填写坐标'}{entry.note ? ` · ${entry.note}` : ''}</small>
+                      </div>
+                      <div className="button-row">
+                        <button onClick={() => void removeCompatibilityEntry(entry.modId)} disabled={Boolean(busy)}>删除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <Field
+                  label="允许的外部命名空间"
+                  value={(project?.compatibility.acceptedNamespaces || []).join('\n')}
+                  onChange={value => {
+                    if (!project) return;
+                    void saveCurrentProject({
+                      ...project,
+                      compatibility: {
+                        ...project.compatibility,
+                        acceptedNamespaces: value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean)
+                      }
+                    });
+                  }}
+                  hint="填 `jei`、`curios` 之类的命名空间后，配方、掉落表和节点里的外部引用会更容易管理。"
+                />
+                <BooleanField
+                  label="允许外部 Tag"
+                  value={project?.compatibility.allowExternalTags !== false}
+                  onChange={value => {
+                    if (!project) return;
+                    void saveCurrentProject({
+                      ...project,
+                      compatibility: {
+                        ...project.compatibility,
+                        allowExternalTags: value
+                      }
+                    });
+                  }}
+                />
+                <div className="hint">如果只是引用别人的方块、物品、标签或配方，直接在 ID 里写 `别的modid:物品名` 就行；这里主要负责“项目知道自己依赖谁”。</div>
               </Panel>
               <Panel title="构建设置">
                 <BooleanField
@@ -3706,7 +4236,12 @@ export default function App() {
               </Panel>
               <Panel title="部署环境">
                 <div className="hint">生成工程后会自动写入环境检查、环境安装提示和本地部署脚本。</div>
-                <pre className="data-preview">{project ? `输出文件：\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\BLOCKFORGE_DEPLOY_COMMANDS.md\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-setup-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-check-env.ps1\n${projectDir}\\generated\\${projectGeneratedRoot(project)}\\blockforge-deploy-local.ps1\n\n常用命令：\ncd ${projectDir}\\generated\\${projectGeneratedRoot(project)}\npowershell -ExecutionPolicy Bypass -File .\\blockforge-check-env.ps1\npowershell -ExecutionPolicy Bypass -File .\\blockforge-deploy-local.ps1 -Build\n\n部署目标：${projectDeployFolder(project)}` : '先创建或打开项目，再生成工程。'}</pre>
+                <div className="button-row wrap">
+                  <button onClick={() => void copyDeploymentCommands()} disabled={!project || Boolean(busy)}>复制部署命令</button>
+                  <button onClick={() => openPath(project ? `${projectDir}\\generated\\${projectGeneratedRoot(project)}` : projectDir)} disabled={!project || Boolean(busy)}>打开生成目录</button>
+                  <button onClick={() => openPath(project ? `${projectDir}\\exports` : projectDir)} disabled={!project || Boolean(busy)}>打开导出目录</button>
+                </div>
+                <pre className="data-preview">{deploymentCommandsText(projectDir, project)}</pre>
               </Panel>
               <Panel title="发布前隐私检查">
                 <div className="list-panel">
@@ -3746,6 +4281,113 @@ export default function App() {
                   </div>
                 )}
                 <pre className="data-preview compact">npm run privacy:scan</pre>
+              </Panel>
+            </section>
+          )}
+
+          {activeView === 'plugins' && (
+            <section className="view-grid two">
+              <Panel title="插件工坊">
+                <Field label="插件包路径" value={pluginPath} onChange={setPluginPath} placeholder="留空则打开文件选择器" />
+                <Field label="插件模板名" value={pluginStarterName} onChange={setPluginStarterName} />
+                <div className="button-row wrap">
+                  <button onClick={importPluginPackage} disabled={!project || Boolean(busy)}>导入插件包</button>
+                  <button onClick={createPluginStarter} disabled={!project || Boolean(busy)}>生成插件模板</button>
+                  <button onClick={refreshPlugins} disabled={!project || Boolean(busy)}>刷新插件</button>
+                  <button onClick={() => openPath(`${projectDir}\\editor\\plugins`)} disabled={!project || Boolean(busy)}>打开插件目录</button>
+                </div>
+                <div className="hint">插件采用声明式 manifest：可以贡献工作台卡片、AI 提示、元素蓝图、外链文档和插件动作。当前版本不执行第三方可执行代码，优先保证安全与可预期性。</div>
+                <div className="list-panel">
+                  {plugins.length === 0 && <div className="tree-empty">还没有安装插件。</div>}
+                  {plugins.map(plugin => (
+                    <div className={`plugin-row ${plugin.enabled ? 'enabled' : 'disabled'}`} key={`${plugin.manifest.id}:${plugin.manifest.version}`}>
+                      <div>
+                        <strong>{plugin.manifest.name}</strong>
+                        <span>{plugin.manifest.version}，作者：{plugin.manifest.author}，目标：{plugin.manifest.compatibleLoaders.join(' / ')}</span>
+                        <small>{plugin.manifest.description}</small>
+                      </div>
+                      <div className="button-row wrap">
+                        <button onClick={() => void togglePlugin(plugin)}>{plugin.enabled ? '停用' : '启用'}</button>
+                        <button onClick={() => void exportPluginPackage(plugin)}>导出</button>
+                        <button onClick={() => void removePlugin(plugin)}>移除</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Panel>
+              <Panel title="插件市场与贡献">
+                <div className="button-row wrap">
+                  <button onClick={refreshPlugins} disabled={!project || Boolean(busy)}>同步内置插件</button>
+                  {pluginCatalog.map(item => (
+                    <button key={item.id} onClick={() => void installBuiltinPlugin(item.id)} disabled={!project || Boolean(busy)}>
+                      安装 {item.name}
+                    </button>
+                  ))}
+                </div>
+                <div className="list-panel">
+                  {pluginCards.length === 0 && <div className="tree-empty">插件卡片会显示在这里。</div>}
+                  {pluginCards.map(card => (
+                    <div className="list-row" key={`${card.pluginId}:${card.id}`}>
+                      <div>
+                        <strong>{card.title}</strong>
+                        <span>{card.pluginName} · {card.description}</span>
+                        <small>{(card.tags || []).join(' / ') || '无标签'}</small>
+                      </div>
+                      <button onClick={() => void runPluginCard(card)}>执行</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="list-panel">
+                  {pluginActions.length === 0 && <div className="tree-empty">插件动作会显示在这里。</div>}
+                  {pluginActions.map(action => (
+                    <div className="list-row" key={`${action.pluginId}:${action.id}`}>
+                      <div>
+                        <strong>{action.label}</strong>
+                        <span>{action.pluginName} · {action.description}</span>
+                      </div>
+                      <button onClick={() => void runPluginAction(action)}>运行</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="list-panel">
+                  {pluginPrompts.length === 0 && <div className="tree-empty">插件 AI 提示会显示在这里。</div>}
+                  {pluginPrompts.map(prompt => (
+                    <div className="list-row" key={`${prompt.pluginId}:${prompt.id}`}>
+                      <div>
+                        <strong>{prompt.label}</strong>
+                        <span>{prompt.pluginName} · {prompt.description || prompt.target}</span>
+                        <small>{prompt.prompt}</small>
+                      </div>
+                      <button onClick={() => setAiPromptByPlugin(prompt.target, prompt.prompt)}>应用到 AI</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="list-panel">
+                  {pluginBlueprints.length === 0 && <div className="tree-empty">插件元素蓝图会显示在这里。</div>}
+                  {pluginBlueprints.map(blueprint => (
+                    <div className="list-row" key={`${blueprint.pluginId}:${blueprint.id}`}>
+                      <div>
+                        <strong>{blueprint.label}</strong>
+                        <span>{blueprint.pluginName} · {blueprint.kind}:{blueprint.elementId}</span>
+                        <small>{blueprint.description}</small>
+                      </div>
+                      <button onClick={() => void applyPluginBlueprint(blueprint)}>生成元素</button>
+                    </div>
+                  ))}
+                </div>
+                <div className="list-panel">
+                  {pluginDocs.length === 0 && <div className="tree-empty">插件文档链接会显示在这里。</div>}
+                  {pluginDocs.map(doc => (
+                    <div className="list-row" key={`${doc.pluginId}:${doc.id}`}>
+                      <div>
+                        <strong>{doc.title}</strong>
+                        <span>{doc.pluginName}</span>
+                        <small>{doc.description || doc.url}</small>
+                      </div>
+                      <button onClick={() => void api?.system.openExternal({ url: doc.url })}>打开</button>
+                    </div>
+                  ))}
+                </div>
               </Panel>
             </section>
           )}
@@ -4004,7 +4646,7 @@ function TreeGroup({ title, items, onPick }: { title: string; items: ElementMode
   );
 }
 
-function ElementQuickEditor({ element, onChange }: { element: ElementModel; onChange(element: ElementModel): void }) {
+function ElementQuickEditor({ element, project, onChange }: { element: ElementModel; project: ProjectModel | null; onChange(element: ElementModel): void }) {
   const update = (patch: Partial<ElementModel>) => onChange({ ...element, ...patch });
   const updateDisplay = (key: 'zh_cn' | 'en_us', value: string) => onChange({
     ...element,
@@ -4016,7 +4658,10 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
   });
   const props = element.properties as Record<string, unknown>;
   const itemKind = String(props.itemKind ?? 'generic') as ItemKind;
-  const isTieredItem = itemKind.startsWith('weapon_') || itemKind.startsWith('tool_') || itemKind === 'magic_wand';
+  const isTieredItem = itemKind.startsWith('weapon_') || itemKind.startsWith('tool_') || itemKind === 'magic_wand' || itemKind.startsWith('armor_');
+  const isWeaponItem = itemKind === 'weapon_sword' || itemKind === 'weapon_axe' || itemKind === 'weapon_bow' || itemKind === 'weapon_crossbow' || itemKind === 'weapon_shield' || itemKind === 'weapon_pistol' || itemKind === 'weapon_rifle' || itemKind === 'weapon_shotgun' || itemKind === 'weapon_magic_gun' || itemKind === 'weapon_spear' || itemKind === 'weapon_hammer' || itemKind === 'weapon_dagger';
+  const isArmorItem = itemKind.startsWith('armor_');
+  const isToolItem = itemKind.startsWith('tool_') || itemKind === 'magic_wand';
   const isFoodItem = itemKind === 'food';
   const applyItemKind = (kind: ItemKind) => onChange({
     ...element,
@@ -4026,6 +4671,7 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
   const potionEffects = Array.isArray(props.effects) ? props.effects as PotionEffectSpec[] : [];
   const enchantmentSlots = Array.isArray(props.slots) ? props.slots as EnchantmentSlot[] : [];
   const incompatible = Array.isArray(props.incompatibleWith) ? props.incompatibleWith as string[] : [];
+  const compatibilityMods = project?.compatibility.externalMods || [];
   const splitMultiValue = (value: string) => value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean);
   const updatePotionEffect = (index: number, patch: Partial<PotionEffectSpec>) => {
     onChange({
@@ -4085,16 +4731,35 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
       <Field label="中文名" value={element.displayName.zh_cn} onChange={value => updateDisplay('zh_cn', value)} />
       <Field label="英文名" value={element.displayName.en_us} onChange={value => updateDisplay('en_us', value)} />
       <Field label="描述" value={element.description} onChange={value => update({ description: value })} />
-      {element.type === 'item' && (
+      {(element.type === 'item' || element.type === 'tool') && (
         <>
-          <SelectField label="物品细分" value={itemKind} options={itemKindLabels} onChange={applyItemKind} />
+          <SelectField label={element.type === 'tool' ? '工具细分' : '物品细分'} value={itemKind} options={itemKindLabels} onChange={applyItemKind} />
           <div className="button-row mini">
             <button type="button" onClick={() => applyItemKind('weapon_sword')}>剑</button>
+            <button type="button" onClick={() => applyItemKind('weapon_axe')}>战斧</button>
+            <button type="button" onClick={() => applyItemKind('weapon_bow')}>弓</button>
+            <button type="button" onClick={() => applyItemKind('weapon_crossbow')}>弩</button>
+            <button type="button" onClick={() => applyItemKind('weapon_pistol')}>手枪</button>
+            <button type="button" onClick={() => applyItemKind('weapon_rifle')}>步枪</button>
+            <button type="button" onClick={() => applyItemKind('weapon_shotgun')}>霰弹枪</button>
+            <button type="button" onClick={() => applyItemKind('weapon_magic_gun')}>魔能枪</button>
+            <button type="button" onClick={() => applyItemKind('weapon_spear')}>长枪</button>
+            <button type="button" onClick={() => applyItemKind('weapon_hammer')}>战锤</button>
+            <button type="button" onClick={() => applyItemKind('weapon_dagger')}>匕首</button>
+            <button type="button" onClick={() => applyItemKind('weapon_shield')}>盾</button>
             <button type="button" onClick={() => applyItemKind('tool_pickaxe')}>镐</button>
+            <button type="button" onClick={() => applyItemKind('tool_axe')}>斧</button>
+            <button type="button" onClick={() => applyItemKind('tool_shovel')}>铲</button>
+            <button type="button" onClick={() => applyItemKind('tool_hoe')}>锄</button>
+            <button type="button" onClick={() => applyItemKind('armor_helmet')}>头盔</button>
+            <button type="button" onClick={() => applyItemKind('armor_chestplate')}>胸甲</button>
+            <button type="button" onClick={() => applyItemKind('armor_leggings')}>护腿</button>
+            <button type="button" onClick={() => applyItemKind('armor_boots')}>靴子</button>
             <button type="button" onClick={() => applyItemKind('magic_wand')}>法杖</button>
             <button type="button" onClick={() => applyItemKind('food')}>食物</button>
           </div>
           <NumberField label="最大堆叠" value={Number(props.maxStackSize ?? 64)} onChange={value => updateProp('maxStackSize', value)} />
+          <SelectField label="稀有度" value={String(props.rarity ?? 'common')} options={itemRarityLabels} onChange={value => updateProp('rarity', value)} />
           <NumberField label="耐久" value={props.durability === undefined ? 0 : Number(props.durability)} onChange={value => updateProp('durability', value || undefined)} />
           {isTieredItem && (
             <>
@@ -4103,21 +4768,53 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
               <NumberField label="攻击速度" value={Number(props.attackSpeed ?? -2.4)} onChange={value => updateProp('attackSpeed', value)} />
             </>
           )}
+          {(isWeaponItem || isToolItem) && (
+            <>
+              <SelectField label="使用动画" value={String(props.useAnimation ?? 'none')} options={itemUseAnimationLabels} onChange={value => updateProp('useAnimation', value)} />
+              <NumberField label="使用时长 tick" value={Number(props.useDuration ?? 32)} onChange={value => updateProp('useDuration', value)} />
+              <NumberField label="附魔能力" value={Number(props.enchantmentValue ?? 1)} onChange={value => updateProp('enchantmentValue', value)} />
+              <BooleanField label="不可维修" value={props.canRepair === false} onChange={value => updateProp('canRepair', !value)} />
+              <Field label="弹药物品" value={String(props.ammoItem ?? '')} onChange={value => updateProp('ammoItem', value)} hint="远程枪械可填 minecraft:arrow / minecraft:snowball 等。留空时仅用于预设说明。" />
+              <NumberField label="每次消耗弹药" value={Number(props.ammoPerShot ?? 1)} onChange={value => updateProp('ammoPerShot', value)} />
+              <NumberField label="弹匣容量" value={Number(props.magazineSize ?? 1)} onChange={value => updateProp('magazineSize', value)} />
+              <NumberField label="装填 tick" value={Number(props.reloadTicks ?? 20)} onChange={value => updateProp('reloadTicks', value)} />
+              <NumberField label="弹丸伤害" value={Number(props.projectileDamage ?? 2)} onChange={value => updateProp('projectileDamage', value)} />
+              <NumberField label="弹丸速度" value={Number(props.projectileSpeed ?? 3)} onChange={value => updateProp('projectileSpeed', value)} step="0.1" />
+              <NumberField label="弹丸散布" value={Number(props.projectileSpread ?? 1)} onChange={value => updateProp('projectileSpread', value)} step="0.1" />
+              <NumberField label="连发数量" value={Number(props.shotCount ?? 1)} onChange={value => updateProp('shotCount', value)} />
+            </>
+          )}
+          {isArmorItem && (
+            <>
+              <SelectField label="使用动画" value={String(props.useAnimation ?? 'none')} options={itemUseAnimationLabels} onChange={value => updateProp('useAnimation', value)} />
+              <NumberField label="防具附魔能力" value={Number(props.enchantmentValue ?? 9)} onChange={value => updateProp('enchantmentValue', value)} />
+              <BooleanField label="不可维修" value={props.canRepair === false} onChange={value => updateProp('canRepair', !value)} />
+            </>
+          )}
           {isFoodItem && (
             <>
               <NumberField label="饱食度" value={Number(props.foodNutrition ?? 4)} onChange={value => updateProp('foodNutrition', value)} />
               <NumberField label="饱和度" value={Number(props.foodSaturation ?? 0.3)} onChange={value => updateProp('foodSaturation', value)} step="0.1" />
+              <BooleanField label="按肉类处理" value={Boolean(props.foodIsMeat)} onChange={value => updateProp('foodIsMeat', value)} />
               <BooleanField label="满饱食也可食用" value={Boolean(props.alwaysEat)} onChange={value => updateProp('alwaysEat', value)} />
             </>
           )}
           <BooleanField label="防火物品" value={Boolean(props.fireResistant)} onChange={value => updateProp('fireResistant', value)} />
+          <Field label="创造物品栏" value={String(props.creativeTab ?? '')} onChange={value => updateProp('creativeTab', value)} hint="例如 blockforge_tab、combat、building_blocks。" />
           <Field label="贴图文件名" value={String(props.texture ?? '')} onChange={value => updateProp('texture', value)} hint="不用写 .png，例如 echo_crystal。" />
-          <Field label="3D模型资源" value={modelValue} onChange={value => updateProp('model', value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="生成到 models/item/ 目录；留空时使用默认物品模型。" />
+          <Field label={element.type === 'tool' ? '工具 3D 模型资源' : '物品 3D 模型资源'} value={modelValue} onChange={value => updateProp('model', value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} hint="生成到 models/item/ 目录；留空时使用默认物品或工具模型。" />
           <div className="button-row mini">
             <button type="button" onClick={() => updateProp('model', `${element.id}_model`)}>生成模型名</button>
             <button type="button" onClick={() => updateProp('model', '')}>清空模型</button>
           </div>
-          <Field label="右键节点逻辑" value={String(props.rightClickLogic ?? '')} onChange={value => updateProp('rightClickLogic', value)} hint="通常写 item:物品ID，用于绑定节点图。" />
+          <Field label="右键节点逻辑" value={String(props.rightClickLogic ?? '')} onChange={value => updateProp('rightClickLogic', value)} hint="通常写 item:物品ID 或 tool:工具ID，用于绑定节点图。" />
+          <div className="button-row mini">
+            <button type="button" onClick={() => updateProp('creativeTab', `${element.namespace}_tab`)}>项目默认物品栏</button>
+            <button type="button" onClick={() => updateProp('creativeTab', 'combat')}>战斗分类</button>
+            <button type="button" onClick={() => updateProp('creativeTab', 'ingredients')}>材料分类</button>
+            <button type="button" onClick={() => updateProp('creativeTab', 'tools_and_utilities')}>工具分类</button>
+            <button type="button" onClick={() => updateProp('creativeTab', 'food_and_drinks')}>食物分类</button>
+          </div>
         </>
       )}
       {element.type === 'block' && (
@@ -4213,6 +4910,11 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
                 onChange={event => updateProp('key', parseRecipeKey(event.target.value))}
               />
               <div className="hint">有序合成使用多行形状和 A=item 形式的材料映射。</div>
+              <div className="button-row mini">
+                {(compatibilityMods.slice(0, 6)).map(entry => (
+                  <button key={entry.modId} type="button" onClick={() => updateProp('key', { ...(props.key || {}), X: `${entry.modId}:` })}>{entry.displayName || entry.modId}</button>
+                ))}
+              </div>
             </>
           )}
           {(props.recipeType === 'shapeless' || !props.recipeType) && (
@@ -4224,6 +4926,11 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
                 onChange={event => updateProp('ingredients', event.target.value.split(/\r?\n|,/).map(item => item.trim()).filter(Boolean))}
               />
               <div className="hint">无序合成每行一个材料，也可以用逗号分隔。</div>
+              <div className="button-row mini">
+                {(compatibilityMods.slice(0, 6)).map(entry => (
+                  <button key={entry.modId} type="button" onClick={() => updateProp('ingredients', [...(Array.isArray(props.ingredients) ? props.ingredients : []), `${entry.modId}:`])}>{entry.displayName || entry.modId}</button>
+                ))}
+              </div>
             </>
           )}
           {props.recipeType === 'smelting' && (
@@ -4243,6 +4950,9 @@ function ElementQuickEditor({ element, onChange }: { element: ElementModel; onCh
           <NumberField label="最大数量" value={Number(props.maxCount ?? 1)} onChange={value => updateProp('maxCount', value)} />
           <div className="button-row mini">
             <button type="button" onClick={() => updateProp('drop', `${element.namespace}:${String(props.targetBlock || element.id)}`)}>掉落目标方块</button>
+            {compatibilityMods.slice(0, 6).map(entry => (
+              <button key={entry.modId} type="button" onClick={() => updateProp('drop', `${entry.modId}:`) }>{entry.displayName || entry.modId}</button>
+            ))}
             <button type="button" onClick={() => onChange({ ...element, properties: { ...props, minCount: 1, maxCount: 1 } })}>固定 1 个</button>
             <button type="button" onClick={() => onChange({ ...element, properties: { ...props, minCount: 1, maxCount: 3 } })}>随机 1-3 个</button>
           </div>

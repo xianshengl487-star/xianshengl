@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { createProject, readProject, type CreateProjectOptions } from '../core/project/projectService';
+import { createProject, readProject, writeProject, type CreateProjectOptions } from '../core/project/projectService';
 import {
   createBlock,
   createFunctionElement,
@@ -12,6 +12,7 @@ import {
   createMobEffect,
   createPotion,
   createRecipe,
+  createTool,
   deleteElement,
   duplicateElement,
   loadElementSet,
@@ -31,6 +32,7 @@ import { exportProjectZip } from '../core/export/exportService';
 import { runPrivacyScan } from '../core/privacy/privacyScanService';
 import { createSnapshot, listSnapshots, restoreSnapshot } from '../core/snapshot/snapshotService';
 import { importTemplatePackage, listTemplates } from '../core/templates/templateService';
+import { createPluginStarter, exportPluginPackage, importPluginPackage, installBuiltinPlugin, listInstalledPlugins, readPluginCatalog, removePluginPackage, setPluginEnabled } from '../core/plugins/pluginService';
 import { createDefaultUiScreen, loadUiScreens, saveUiScreen } from '../core/ui/uiService';
 import { deepSeekPreset, type AiChatMessage, type AiProviderConfig } from '../shared/types/ai';
 import { type LoaderId } from '../shared/types/project';
@@ -198,6 +200,7 @@ function setupMenu() {
         { label: '构建设置', click: () => sendCommand('view:settings') },
         { label: '节点逻辑编辑器', click: () => sendCommand('view:logic') },
         { label: '可视化界面编辑器', click: () => sendCommand('view:ui') },
+        { label: '插件工坊', click: () => sendCommand('view:plugins') },
         { label: '项目管理', click: () => sendCommand('view:manage') },
         { type: 'separator' },
         { role: 'toggleDevTools' }
@@ -225,6 +228,10 @@ async function createSampleProject(projectDir: string, primaryLoader: LoaderId =
     item.properties.texture = 'ice_wand';
     item.properties.model = 'ice_wand_model';
     item.properties.rightClickLogic = 'item:ice_wand';
+    const tool = createTool(project, 'frost_pickaxe', '霜冻工具');
+    tool.properties.itemKind = 'tool_pickaxe';
+    tool.properties.texture = 'frost_pickaxe';
+    tool.properties.model = 'frost_pickaxe_model';
     const block = createBlock(project, 'frost_block', '霜冻方块');
     block.properties.textureAll = 'frost_block';
     block.properties.model = 'frost_block_model';
@@ -246,7 +253,7 @@ async function createSampleProject(projectDir: string, primaryLoader: LoaderId =
     enchantment.properties.slots = ['mainhand'];
     enchantment.properties.description = '让武器更适合触发冰霜主题逻辑。';
 
-    for (const element of [item, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
+    for (const element of [item, tool, block, recipe, loot, fn, effect, potion, enchantment]) await saveElement(projectDir, element);
 
     const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'blockforge-sample-'));
     const itemTexture = path.join(tmpDir, 'ice_wand.png');
@@ -254,8 +261,10 @@ async function createSampleProject(projectDir: string, primaryLoader: LoaderId =
     await fs.writeFile(itemTexture, sampleTexturePng);
     await fs.writeFile(blockTexture, sampleTexturePng);
     await importTexture(projectDir, itemTexture, 'item_texture', 'item:ice_wand', project.modId, project.primaryLoader);
+    await importTexture(projectDir, itemTexture, 'item_texture', 'tool:frost_pickaxe', project.modId, project.primaryLoader);
     await importTexture(projectDir, blockTexture, 'block_texture', 'block:frost_block', project.modId, project.primaryLoader);
     await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:item/handheld', textures: { layer0: `${project.modId}:item/ice_wand` } }, null, 2), 'item_model', 'item:ice_wand', project.modId, 'ice_wand_model', project.primaryLoader);
+    await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:item/handheld', textures: { layer0: `${project.modId}:item/frost_pickaxe` } }, null, 2), 'item_model', 'tool:frost_pickaxe', project.modId, 'frost_pickaxe_model', project.primaryLoader);
     await saveModelJson(projectDir, JSON.stringify({ parent: 'minecraft:block/cube_all', textures: { all: `${project.modId}:block/frost_block` } }, null, 2), 'block_model', 'block:frost_block', project.modId, 'frost_block_model', project.primaryLoader);
 
     const graph = createDefaultLogicGraph('Ice wand right click', 'item:ice_wand', project.primaryLoader);
@@ -280,6 +289,12 @@ function registerIpc() {
     return { projectDir: path.resolve(input.projectDir), project };
   });
   ipcMain.handle('project:createSample', async (_event, input: { projectDir: string; primaryLoader?: LoaderId }) => createSampleProject(input.projectDir, input.primaryLoader || 'forge'));
+  ipcMain.handle('project:save', async (_event, input: { projectDir: string; project: unknown }) => {
+    const current = await readProject(input.projectDir);
+    const next = { ...current, ...(input.project as Record<string, unknown>) } as typeof current;
+    await writeProject(input.projectDir, next);
+    return readProject(input.projectDir);
+  });
 
   ipcMain.handle('project:open', async (_event, input?: { projectDir?: string }) => {
     let projectDir = input?.projectDir;
@@ -303,6 +318,7 @@ function registerIpc() {
   });
 
   ipcMain.handle('elements:createItem', async (_event, input: { projectDir: string; id: string; zhName: string }) => createItem(await readProject(input.projectDir), input.id, input.zhName));
+  ipcMain.handle('elements:createTool', async (_event, input: { projectDir: string; id: string; zhName: string }) => createTool(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createBlock', async (_event, input: { projectDir: string; id: string; zhName: string }) => createBlock(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createRecipe', async (_event, input: { projectDir: string; id: string; zhName: string }) => createRecipe(await readProject(input.projectDir), input.id, input.zhName));
   ipcMain.handle('elements:createLootTable', async (_event, input: { projectDir: string; id: string; zhName: string }) => createLootTable(await readProject(input.projectDir), input.id, input.zhName));
@@ -492,11 +508,45 @@ function registerIpc() {
     return importTemplatePackage(input.projectDir, sourceFile);
   });
   ipcMain.handle('templates:list', async (_event, input: { projectDir: string }) => listTemplates(input.projectDir));
+  ipcMain.handle('plugins:catalog', async () => readPluginCatalog());
+  ipcMain.handle('plugins:list', async (_event, input: { projectDir: string }) => listInstalledPlugins(input.projectDir));
+  ipcMain.handle('plugins:import', async (_event, input: { projectDir: string; sourceFile?: string }) => {
+    let sourceFile = input.sourceFile;
+    if (!sourceFile) {
+      const picked = await dialog.showOpenDialog({ properties: ['openFile'], filters: [{ name: 'BlockForge 插件包', extensions: ['bfplugin', 'zip'] }] });
+      if (picked.canceled || picked.filePaths.length === 0) return null;
+      sourceFile = picked.filePaths[0];
+    }
+    return importPluginPackage(input.projectDir, sourceFile);
+  });
+  ipcMain.handle('plugins:installBuiltin', async (_event, input: { projectDir: string; pluginId: string }) => installBuiltinPlugin(input.projectDir, input.pluginId));
+  ipcMain.handle('plugins:toggle', async (_event, input: { projectDir: string; pluginId: string; enabled: boolean }) => setPluginEnabled(input.projectDir, input.pluginId, input.enabled));
+  ipcMain.handle('plugins:remove', async (_event, input: { projectDir: string; pluginId: string }) => removePluginPackage(input.projectDir, input.pluginId));
+  ipcMain.handle('plugins:createStarter', async (_event, input: { projectDir: string; name?: string }) => createPluginStarter(input.projectDir, input.name || 'my_plugin'));
+  ipcMain.handle('plugins:export', async (_event, input: { projectDir: string; pluginId: string; outputFile?: string }) => {
+    let outputFile = input.outputFile;
+    if (!outputFile) {
+      const defaultPath = path.join(input.projectDir, 'exports', `${input.pluginId}.bfplugin.zip`);
+      const picked = await dialog.showSaveDialog({
+        title: '导出插件包',
+        defaultPath,
+        filters: [{ name: 'BlockForge 插件包', extensions: ['zip'] }]
+      });
+      if (picked.canceled || !picked.filePath) return null;
+      outputFile = picked.filePath;
+    }
+    return exportPluginPackage(input.projectDir, input.pluginId, outputFile);
+  });
   ipcMain.handle('privacy:scan', async () => runPrivacyScan(path.resolve(__dirname, '../..')));
   ipcMain.handle('system:openPath', async (_event, input: { targetPath: string }) => {
     await fs.mkdir(input.targetPath, { recursive: true });
     const result = await shell.openPath(input.targetPath);
     if (result) throw new Error(result);
+    return true;
+  });
+  ipcMain.handle('system:openExternal', async (_event, input: { url: string }) => {
+    if (!/^https?:\/\//i.test(input.url)) throw new Error('只允许打开 http 或 https 链接。');
+    await shell.openExternal(input.url);
     return true;
   });
 }

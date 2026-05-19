@@ -1,4 +1,4 @@
-import type { BlockElement, EnchantmentElement, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, RecipeElement } from '../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, RecipeElement, ToolElement } from '../../shared/types/elements';
 import type { BlockForgeIR } from '../../shared/types/logic';
 import type { ProjectModel } from '../../shared/types/project';
 import { generateFabricProject } from './fabric/fabricGenerator';
@@ -9,6 +9,7 @@ export interface ProjectGenerateInput {
   projectDir: string;
   project: ProjectModel;
   items?: ItemElement[];
+  tools?: ToolElement[];
   blocks?: BlockElement[];
   recipes?: RecipeElement[];
   lootTables?: LootTableElement[];
@@ -24,10 +25,11 @@ export async function generateProjectArtifacts(input: ProjectGenerateInput): Pro
     projectDir: input.projectDir,
     project: input.project
   };
+  const itemList = [...(input.items || []), ...(input.tools || [])];
   if (input.project.primaryLoader === 'fabric') {
     return generateFabricProject({
       ...common,
-      items: input.items || [],
+      items: itemList,
       blocks: input.blocks || [],
       recipes: input.recipes || [],
       lootTables: input.lootTables || [],
@@ -48,7 +50,7 @@ export async function generateProjectArtifacts(input: ProjectGenerateInput): Pro
   }
   return generateForgeProject({
     ...common,
-    items: input.items || [],
+    items: itemList,
     blocks: input.blocks || [],
     recipes: input.recipes || [],
     lootTables: input.lootTables || [],

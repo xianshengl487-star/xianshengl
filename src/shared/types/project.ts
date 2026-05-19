@@ -24,6 +24,16 @@ export function isPluginLoader(loader: LoaderId): loader is 'paper' {
   return loader === 'paper';
 }
 
+export interface ModCompatibilityEntry {
+  modId: string;
+  displayName: string;
+  versionRange: string;
+  dependencyType: 'required' | 'optional' | 'compileOnly' | 'runtimeOnly';
+  side: 'both' | 'client' | 'server';
+  gradleCoordinate: string;
+  note: string;
+}
+
 export interface ProjectModel {
   schemaVersion: string;
   projectId: string;
@@ -40,6 +50,11 @@ export interface ProjectModel {
   license: string;
   createdAt: string;
   updatedAt: string;
+  compatibility: {
+    externalMods: ModCompatibilityEntry[];
+    acceptedNamespaces: string[];
+    allowExternalTags: boolean;
+  };
   features: {
     datapack: boolean;
     resourcepack: boolean;
@@ -72,6 +87,11 @@ export function createDefaultProject(displayName: string, modId: string, primary
     license: 'All Rights Reserved',
     createdAt: now,
     updatedAt: now,
+    compatibility: {
+      externalMods: [],
+      acceptedNamespaces: [],
+      allowExternalTags: true
+    },
     features: {
       datapack: true,
       resourcepack: true,

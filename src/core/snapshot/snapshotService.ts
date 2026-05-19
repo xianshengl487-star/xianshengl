@@ -84,7 +84,7 @@ export async function restoreSnapshot(projectDir: string, snapshotId: string): P
   } catch {}
 
   const editorSnapshot = path.join(snapshotPath, 'editor');
-  for (const name of ['project.json', 'elements', 'logic', 'variables', 'resources', 'templates', 'ai']) {
+  for (const name of ['project.json', 'elements', 'logic', 'variables', 'resources', 'templates', 'plugins', 'ai']) {
     const src = path.join(editorSnapshot, name);
     const dest = path.join(projectDir, 'editor', name);
     try {

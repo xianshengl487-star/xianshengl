@@ -15,6 +15,7 @@ const allowedRoots = [
   'editor/ui/',
   'editor/variables/',
   'editor/templates/',
+  'editor/plugins/',
   'src/custom/'
 ];
 

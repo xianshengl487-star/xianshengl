@@ -1,9 +1,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement } from '../../../shared/types/elements';
+import type { BlockElement, EnchantmentElement, EnchantmentSlot, FunctionElement, ItemElement, LootTableElement, MobEffectElement, PotionElement, PotionEffectSpec, RecipeElement, ToolElement } from '../../../shared/types/elements';
 import type { BlockForgeIR } from '../../../shared/types/logic';
 import type { ProjectModel } from '../../../shared/types/project';
 import { copyResourcesToGenerated } from '../../resources/resourceService';
+
+type ItemLikeElement = ItemElement | ToolElement;
 
 function javaPackagePath(pkg: string): string { return pkg.replace(/\./g, '/'); }
 function className(id: string): string { return id.split('_').map(part => part.charAt(0).toUpperCase() + part.slice(1)).join(''); }
@@ -21,6 +23,23 @@ function intOr(value: unknown, fallback: number): number {
   return Math.round(numberOr(value, fallback));
 }
 
+function compatibilityEntries(project: ProjectModel) {
+  return Array.isArray(project.compatibility?.externalMods) ? project.compatibility.externalMods.filter(entry => entry.modId) : [];
+}
+
+function fabricDependencyLine(entry: { dependencyType: string; gradleCoordinate: string }): string {
+  if (!entry.gradleCoordinate) return '';
+  if (entry.dependencyType === 'runtimeOnly') return `    runtimeOnly "${entry.gradleCoordinate}"`;
+  if (entry.dependencyType === 'compileOnly' || entry.dependencyType === 'optional') return `    modCompileOnly "${entry.gradleCoordinate}"`;
+  return `    modImplementation "${entry.gradleCoordinate}"`;
+}
+
+function compatibilityReadme(project: ProjectModel): string {
+  const entries = compatibilityEntries(project);
+  if (entries.length === 0) return `# ${project.displayName} Compatibility\n\n暂无外部模组依赖。\n`;
+  return `# ${project.displayName} Compatibility\n\n${entries.map(entry => `- ${entry.displayName || entry.modId} (${entry.modId})\n  - 类型: ${entry.dependencyType}\n  - 范围: ${entry.versionRange || '[0,)'}\n  - 侧: ${entry.side}\n  - 坐标: ${entry.gradleCoordinate || '未填写'}\n  - 备注: ${entry.note || '无'}`).join('\n')}\n`;
+}
+
 function javaFloat(value: number): string {
   return `${Number(value.toFixed(3))}f`;
 }
@@ -31,29 +50,34 @@ function itemTierCode(tier: string | undefined): string {
   return allowed.has(normalized) ? `Tiers.${normalized}` : 'Tiers.IRON';
 }
 
-function isDurableItem(item: ItemElement): boolean {
+function isDurableItem(item: ItemLikeElement): boolean {
   const kind = item.properties.itemKind || 'generic';
-  return kind === 'magic_wand' || kind.startsWith('weapon_') || kind.startsWith('tool_') || numberOr(item.properties.durability, 0) > 0;
+  return kind === 'magic_wand' || kind.startsWith('weapon_') || kind.startsWith('tool_') || kind.startsWith('armor_') || numberOr(item.properties.durability, 0) > 0;
 }
 
-function itemPropertiesCode(item: ItemElement): string {
+function itemPropertiesCode(item: ItemLikeElement): string {
   const props = item.properties;
   const durable = isDurableItem(item);
   const stackSize = durable ? 1 : Math.max(1, Math.min(64, intOr(props.maxStackSize, 64)));
   const durability = durable ? Math.max(1, intOr(props.durability, 250)) : 0;
   let code = `new Item.Properties().stacksTo(${stackSize})`;
   if (durability > 0) code += `.durability(${durability})`;
+  if (props.rarity) code += `.rarity(Rarity.${String(props.rarity).toUpperCase()})`;
   if (props.fireResistant) code += '.fireResistant()';
+  if (props.canRepair === false) code += '.setNoRepair()';
+  if (props.useDuration !== undefined) code += `.useDuration(${Math.max(1, intOr(props.useDuration, 32))})`;
+  if (props.useAnimation && props.useAnimation !== 'none') code += `.useAnimation(UseAnim.${String(props.useAnimation).toUpperCase()})`;
   if (props.itemKind === 'food') {
     const nutrition = Math.max(0, intOr(props.foodNutrition, 4));
     const saturation = Math.max(0, numberOr(props.foodSaturation, 0.3));
     const alwaysEat = props.alwaysEat ? '.alwaysEat()' : '';
-    code += `.food(new FoodProperties.Builder().nutrition(${nutrition}).saturationMod(${javaFloat(saturation)})${alwaysEat}.build())`;
+    const meat = props.foodIsMeat ? '.meat()' : '';
+    code += `.food(new FoodProperties.Builder().nutrition(${nutrition}).saturationMod(${javaFloat(saturation)})${meat}${alwaysEat}.build())`;
   }
   return code;
 }
 
-function itemFactoryCode(item: ItemElement): string {
+function itemFactoryCode(item: ItemLikeElement): string {
   const props = item.properties;
   const kind = props.itemKind || 'generic';
   const tier = itemTierCode(props.tier);
@@ -62,10 +86,34 @@ function itemFactoryCode(item: ItemElement): string {
   const attackSpeed = numberOr(props.attackSpeed, kind.includes('axe') ? -3.1 : -2.4);
   if (kind === 'weapon_sword') return `new SwordItem(${tier}, ${intOr(attackDamage, 4)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'weapon_axe' || kind === 'tool_axe') return `new AxeItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_bow') return `new BowItem(${itemProps})`;
+  if (kind === 'weapon_crossbow') return `new CrossbowItem(${itemProps})`;
+  if (kind === 'weapon_pistol' || kind === 'weapon_rifle' || kind === 'weapon_shotgun' || kind === 'weapon_magic_gun') return `new CrossbowItem(${itemProps})`;
+  if (kind === 'weapon_spear') return `new net.minecraft.world.item.TridentItem(${itemProps})`;
+  if (kind === 'weapon_hammer') return `new AxeItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_dagger') return `new SwordItem(${tier}, ${intOr(attackDamage, 2)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
+  if (kind === 'weapon_shield') return `new ShieldItem(${itemProps})`;
+  if (kind === 'armor_helmet') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.HELMET, ${itemProps})`;
+  if (kind === 'armor_chestplate') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.CHESTPLATE, ${itemProps})`;
+  if (kind === 'armor_leggings') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.LEGGINGS, ${itemProps})`;
+  if (kind === 'armor_boots') return `new ArmorItem(ArmorMaterials.IRON, ArmorItem.Type.BOOTS, ${itemProps})`;
   if (kind === 'tool_pickaxe') return `new PickaxeItem(${tier}, ${intOr(attackDamage, 1)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'tool_shovel') return `new ShovelItem(${tier}, ${javaFloat(attackDamage)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   if (kind === 'tool_hoe') return `new HoeItem(${tier}, ${intOr(attackDamage, -2)}, ${javaFloat(attackSpeed)}, ${itemProps})`;
   return `new Item(${itemProps})`;
+}
+
+function fabricBuildDependencies(project: ProjectModel): string {
+  const base = [
+    `    minecraft 'com.mojang:minecraft:${project.minecraftVersion}'`,
+    `    modImplementation 'net.fabricmc:fabric-loader:0.14.19'`,
+    `    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.91.0+1.20.1'`
+  ];
+  for (const entry of compatibilityEntries(project)) {
+    const line = fabricDependencyLine(entry);
+    if (line) base.push(line);
+  }
+  return base.join('\n');
 }
 
 function blockPropertiesCode(block: BlockElement): string {
@@ -336,7 +384,7 @@ Write-Host "[BlockForge] 请启动 Minecraft Fabric ${project.minecraftVersion} 
 export interface FabricGenerateInput {
   projectDir: string;
   project: ProjectModel;
-  items: ItemElement[];
+  items: ItemLikeElement[];
   blocks: BlockElement[];
   recipes?: RecipeElement[];
   lootTables?: LootTableElement[];
@@ -359,7 +407,7 @@ export async function generateFabricProject(input: FabricGenerateInput): Promise
   await fs.mkdir(root, { recursive: true });
 
   await write(path.join(root, 'settings.gradle'), `pluginManagement {\n    repositories {\n        maven { name = 'Aliyun Gradle Plugin'; url = uri('https://maven.aliyun.com/repository/gradle-plugin') }\n        maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n        maven { name = 'Fabric'; url = uri('https://maven.fabricmc.net/') }\n        gradlePluginPortal()\n        mavenCentral()\n    }\n}\n\nrootProject.name='${project.modId}'\n`);
-  await write(path.join(root, 'build.gradle'), `plugins { id 'fabric-loom' version '1.16-SNAPSHOT' }\n\ngroup='${project.packageName}'\nversion='1.0.0'\nbase { archivesName = '${project.modId}' }\n\njava {\n    toolchain.languageVersion = JavaLanguageVersion.of(17)\n    withSourcesJar()\n}\n\ntasks.withType(JavaCompile).configureEach {\n    options.encoding = 'UTF-8'\n    options.release = 17\n}\n\nrepositories {\n    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n    maven { name = 'Fabric'; url = uri('https://maven.fabricmc.net/') }\n    mavenCentral()\n}\n\nminecraft {\n    mappings loom.officialMojangMappings()\n}\n\ndependencies {\n    minecraft 'com.mojang:minecraft:${project.minecraftVersion}'\n    modImplementation 'net.fabricmc:fabric-loader:0.14.19'\n    modImplementation 'net.fabricmc.fabric-api:fabric-api:0.91.0+1.20.1'\n}\n\nprocessResources {\n    inputs.property 'version', project.version\n    filteringCharset = 'UTF-8'\n    filesMatching('fabric.mod.json') {\n        expand version: project.version\n    }\n}\n`);
+  await write(path.join(root, 'build.gradle'), `plugins { id 'fabric-loom' version '1.16-SNAPSHOT' }\n\ngroup='${project.packageName}'\nversion='1.0.0'\nbase { archivesName = '${project.modId}' }\n\njava {\n    toolchain.languageVersion = JavaLanguageVersion.of(17)\n    withSourcesJar()\n}\n\ntasks.withType(JavaCompile).configureEach {\n    options.encoding = 'UTF-8'\n    options.release = 17\n}\n\nrepositories {\n    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }\n    maven { name = 'Fabric'; url = uri('https://maven.fabricmc.net/') }\n    mavenCentral()\n}\n\nminecraft {\n    mappings loom.officialMojangMappings()\n}\n\ndependencies {\n${fabricBuildDependencies(project)}\n}\n\nprocessResources {\n    inputs.property 'version', project.version\n    filteringCharset = 'UTF-8'\n    filesMatching('fabric.mod.json') {\n        expand version: project.version\n    }\n}\n`);
   await write(path.join(root, 'gradle.properties'), `org.gradle.jvmargs=-Xmx2G -Dfile.encoding=UTF-8\norg.gradle.daemon=false\nminecraft_version=${project.minecraftVersion}\nmod_version=1.0.0\n`);
   await write(path.join(root, 'BLOCKFORGE_DEPLOY_COMMANDS.md'), deployCommandsMarkdown(project));
   await write(path.join(root, 'blockforge-setup-env.ps1'), setupEnvScript());
@@ -369,7 +417,7 @@ export async function generateFabricProject(input: FabricGenerateInput): Promise
   const modClass = className(project.modId) + 'Mod';
   await write(path.join(pkgDir, `${modClass}.java`), `package ${project.packageName};\n\nimport net.fabricmc.api.ModInitializer;\nimport org.slf4j.Logger;\nimport org.slf4j.LoggerFactory;\n\npublic class ${modClass} implements ModInitializer {\n    public static final String MODID = "${project.modId}";\n    public static final Logger LOGGER = LoggerFactory.getLogger(MODID);\n\n    @Override\n    public void onInitialize() {\n        ModBlocks.register();\n        ModItems.register();\n        ModMobEffects.register();\n        ModPotions.register();\n        ModEnchantments.register();\n        ModCreativeTabs.register();\n        LOGGER.info(\"Loaded {}\", MODID);\n    }\n}\n`);
 
-  await write(path.join(pkgDir, 'ModItems.java'), `package ${project.packageName};\n\nimport net.minecraft.core.registries.BuiltInRegistries;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.food.FoodProperties;\nimport net.minecraft.world.item.AxeItem;\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.item.HoeItem;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.PickaxeItem;\nimport net.minecraft.world.item.ShovelItem;\nimport net.minecraft.world.item.SwordItem;\nimport net.minecraft.world.item.Tiers;\nimport net.minecraft.core.registries.Registries;\nimport net.minecraft.world.item.CreativeModeTab;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.item.Items;\nimport net.minecraft.core.Registry;\n\npublic class ModItems {\n${items.map(i => `    public static final Item ${constantName(i.id)} = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(${modClass}.MODID, "${i.id}"), ${itemFactoryCode(i)});`).join('\n')}\n${blocks.map(b => `    public static final Item ${constantName(b.id)}_ITEM = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(${modClass}.MODID, "${b.id}"), new BlockItem(ModBlocks.${constantName(b.id)}, new Item.Properties()));`).join('\n')}\n\n    public static void register() {}\n}\n`);
+  await write(path.join(pkgDir, 'ModItems.java'), `package ${project.packageName};\n\nimport net.minecraft.core.registries.BuiltInRegistries;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.food.FoodProperties;\nimport net.minecraft.world.item.ArmorItem;\nimport net.minecraft.world.item.ArmorMaterials;\nimport net.minecraft.world.item.AxeItem;\nimport net.minecraft.world.item.BlockItem;\nimport net.minecraft.world.item.BowItem;\nimport net.minecraft.world.item.CrossbowItem;\nimport net.minecraft.world.item.HoeItem;\nimport net.minecraft.world.item.Item;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.PickaxeItem;\nimport net.minecraft.world.item.Rarity;\nimport net.minecraft.world.item.ShieldItem;\nimport net.minecraft.world.item.ShovelItem;\nimport net.minecraft.world.item.SwordItem;\nimport net.minecraft.world.item.Tiers;\nimport net.minecraft.world.item.UseAnim;\nimport net.minecraft.core.registries.Registries;\nimport net.minecraft.world.item.CreativeModeTab;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.world.item.Items;\nimport net.minecraft.core.Registry;\n\npublic class ModItems {\n${items.map(i => `    public static final Item ${constantName(i.id)} = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(${modClass}.MODID, "${i.id}"), ${itemFactoryCode(i)});`).join('\n')}\n${blocks.map(b => `    public static final Item ${constantName(b.id)}_ITEM = Registry.register(BuiltInRegistries.ITEM, new ResourceLocation(${modClass}.MODID, "${b.id}"), new BlockItem(ModBlocks.${constantName(b.id)}, new Item.Properties()));`).join('\n')}\n\n    public static void register() {}\n}\n`);
 
   await write(path.join(pkgDir, 'ModBlocks.java'), `package ${project.packageName};\n\nimport net.fabricmc.fabric.api.object.builder.v1.block.FabricBlockSettings;\nimport net.minecraft.core.Registry;\nimport net.minecraft.core.registries.BuiltInRegistries;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.level.block.Block;\nimport net.minecraft.world.level.block.Blocks;\nimport net.minecraft.world.level.block.SoundType;\n\npublic class ModBlocks {\n${blocks.map(b => `    public static final Block ${constantName(b.id)} = Registry.register(BuiltInRegistries.BLOCK, new ResourceLocation(${modClass}.MODID, "${b.id}"), new Block(${blockPropertiesCode(b)}));`).join('\n')}\n\n    public static void register() {}\n}\n`);
 
@@ -380,6 +428,7 @@ export async function generateFabricProject(input: FabricGenerateInput): Promise
   await write(path.join(pkgDir, 'ModEnchantments.java'), `package ${project.packageName};\n\nimport net.minecraft.core.Registry;\nimport net.minecraft.core.registries.BuiltInRegistries;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.entity.EquipmentSlot;\nimport net.minecraft.world.item.enchantment.Enchantment;\nimport net.minecraft.world.item.enchantment.EnchantmentCategory;\nimport net.minecraft.world.item.enchantment.Enchantment.Rarity;\n\npublic class ModEnchantments {\n${enchantments.map(enchantment => `    public static final Enchantment ${constantName(enchantment.id)} = Registry.register(BuiltInRegistries.ENCHANTMENT, new ResourceLocation(${modClass}.MODID, "${enchantment.id}"), ${enchantmentFactoryCode(enchantment)});`).join('\n')}\n\n    public static void register() {}\n}\n`);
 
   await write(path.join(pkgDir, 'ModCreativeTabs.java'), `package ${project.packageName};\n\nimport net.minecraft.core.Registry;\nimport net.minecraft.core.registries.BuiltInRegistries;\nimport net.minecraft.network.chat.Component;\nimport net.minecraft.resources.ResourceLocation;\nimport net.minecraft.world.item.CreativeModeTab;\nimport net.minecraft.world.item.ItemStack;\nimport net.minecraft.world.item.Items;\n\npublic class ModCreativeTabs {\n    public static final CreativeModeTab MAIN_TAB = Registry.register(BuiltInRegistries.CREATIVE_MODE_TAB, new ResourceLocation(${modClass}.MODID, "${project.modId}_tab"), CreativeModeTab.builder()\n        .title(Component.translatable("itemGroup.${project.modId}"))\n        .icon(() -> new ItemStack(Items.CRAFTING_TABLE))\n        .displayItems((params, output) -> {\n${items.map(i => `            output.accept(ModItems.${constantName(i.id)});`).join('\n')}\n${blocks.map(b => `            output.accept(ModItems.${constantName(b.id)}_ITEM);`).join('\n')}\n        })\n        .build());\n\n    public static void register() {}\n}\n`);
+  await write(path.join(root, 'BLOCKFORGE_COMPATIBILITY.md'), compatibilityReadme(project));
 
   if (logicIR.length > 0) {
     await write(path.join(pkgDir, 'logic/README.md'), `# Fabric 节点逻辑预览\n\n当前节点图数量：${logicIR.length}\n\n首版已经保存了节点图和 IR，但 Fabric 的事件代码适配仍在补齐中。\n你可以先继续编辑节点图、变量和 NBT，后续版本会把这些图再转换成 Fabric 事件代码。\n`);
@@ -402,7 +451,8 @@ export async function generateFabricProject(input: FabricGenerateInput): Promise
       java: '>=17',
       'fabric-loader': '>=0.14.19',
       'fabric-api': '*'
-    }
+    },
+    recommends: Object.fromEntries(compatibilityEntries(project).filter(entry => entry.dependencyType === 'optional').map(entry => [entry.modId, entry.versionRange || '*']))
   }, null, 2));
 
   await writeJson(path.join(resDir, `assets/${project.modId}/lang/zh_cn.json`), { [`itemGroup.${project.modId}`]: project.displayName });
