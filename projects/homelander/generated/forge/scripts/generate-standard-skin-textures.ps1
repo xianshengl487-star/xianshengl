@@ -188,10 +188,115 @@ function ExportArmorLayers($name, $skin) {
     CopyRectAlpha $skin $layer2 16 32 24 16 16 16
     CopyRectAlpha $skin $layer2 0 32 16 16 0 16
 
+    PaintArmorDetails $layer1 $name
+    PaintArmorDetails $layer2 $name
+
     $layer1.Save((Join-Path $ArmorDir "${name}_layer_1.png"), [System.Drawing.Imaging.ImageFormat]::Png)
     $layer2.Save((Join-Path $ArmorDir "${name}_layer_2.png"), [System.Drawing.Imaging.ImageFormat]::Png)
     $layer1.Dispose()
     $layer2.Dispose()
+}
+
+function PaintArmorDetails($bmp, $name) {
+    $g = [System.Drawing.Graphics]::FromImage($bmp)
+    $g.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::NearestNeighbor
+    $g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::None
+    $g.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::Half
+    try {
+        switch ($name) {
+            "homelander" {
+                FillRect $g 32 1 16 2 "#F4D35E"
+                FillRect $g 32 3 16 1 "#9B1E2B"
+                StrokeRect $g 19 19 10 13 "#0F214A"
+                FillRect $g 20 20 8 2 "#C61F2F"
+                FillRect $g 23 16 2 16 "#F4D35E"
+                FillRect $g 44 21 8 2 "#C61F2F"
+                FillRect $g 4 21 4 2 "#C61F2F"
+                FillRect $g 0 27 16 1 "#0F214A"
+                FillRect $g 16 27 16 1 "#0F214A"
+                FillRect $g 40 27 16 1 "#0F214A"
+            }
+            "starlight" {
+                FillRect $g 32 1 16 2 "#FFF5C6"
+                FillRect $g 32 3 16 1 "#F9E076"
+                StrokeRect $g 19 19 10 13 "#8A6E27"
+                FillRect $g 20 20 8 2 "#FFD24D"
+                FillRect $g 23 16 2 16 "#FFFFFF"
+                FillRect $g 44 21 8 2 "#FFD24D"
+                FillRect $g 4 21 4 2 "#F9E076"
+                FillRect $g 0 27 16 1 "#8A6E27"
+                FillRect $g 16 27 16 1 "#8A6E27"
+                FillRect $g 40 27 16 1 "#8A6E27"
+            }
+            "a_train" {
+                FillRect $g 32 1 16 2 "#FFFFFF"
+                FillRect $g 32 3 16 1 "#E3242B"
+                StrokeRect $g 19 19 10 13 "#15377F"
+                FillRect $g 20 20 8 2 "#E3242B"
+                FillRect $g 23 16 2 16 "#FFFFFF"
+                FillRect $g 44 21 8 2 "#E3242B"
+                FillRect $g 4 21 4 2 "#E3242B"
+                FillRect $g 0 27 16 1 "#15377F"
+                FillRect $g 16 27 16 1 "#15377F"
+                FillRect $g 40 27 16 1 "#15377F"
+            }
+            "noir" {
+                FillRect $g 32 1 16 2 "#C9CED6"
+                FillRect $g 32 3 16 1 "#30343D"
+                StrokeRect $g 19 19 10 13 "#050505"
+                FillRect $g 20 20 8 2 "#3B4250"
+                FillRect $g 23 16 2 16 "#C9CED6"
+                FillRect $g 44 21 8 2 "#3B4250"
+                FillRect $g 4 21 4 2 "#3B4250"
+                FillRect $g 0 27 16 1 "#050505"
+                FillRect $g 16 27 16 1 "#050505"
+                FillRect $g 40 27 16 1 "#050505"
+            }
+            "deep" {
+                FillRect $g 32 1 16 2 "#64E4E2"
+                FillRect $g 32 3 16 1 "#0B5B68"
+                StrokeRect $g 19 19 10 13 "#043039"
+                FillRect $g 20 20 8 2 "#0E9E9A"
+                FillRect $g 23 16 2 16 "#FFD96A"
+                FillRect $g 44 21 8 2 "#0E9E9A"
+                FillRect $g 4 21 4 2 "#0E9E9A"
+                FillRect $g 0 27 16 1 "#043039"
+                FillRect $g 16 27 16 1 "#043039"
+                FillRect $g 40 27 16 1 "#043039"
+            }
+            "translucent" {
+                FillRect $g 32 1 16 2 "#FFFFFF"
+                FillRect $g 32 3 16 1 "#A7E8FF"
+                StrokeRect $g 19 19 10 13 "#5F7E88"
+                FillRect $g 20 20 8 2 "#DDF8FF"
+                FillRect $g 23 16 2 16 "#FFFFFF"
+                FillRect $g 44 21 8 2 "#A7E8FF"
+                FillRect $g 4 21 4 2 "#A7E8FF"
+                FillRect $g 0 27 16 1 "#5F7E88"
+                FillRect $g 16 27 16 1 "#5F7E88"
+                FillRect $g 40 27 16 1 "#5F7E88"
+            }
+            "maeve" {
+                FillRect $g 32 1 16 2 "#F0C45A"
+                FillRect $g 32 3 16 1 "#C61F2F"
+                StrokeRect $g 19 19 10 13 "#2A0A12"
+                FillRect $g 20 20 8 2 "#C61F2F"
+                FillRect $g 23 16 2 16 "#F0C45A"
+                FillRect $g 44 21 8 2 "#C61F2F"
+                FillRect $g 4 21 4 2 "#C61F2F"
+                FillRect $g 0 27 16 1 "#2A0A12"
+                FillRect $g 16 27 16 1 "#2A0A12"
+                FillRect $g 40 27 16 1 "#2A0A12"
+            }
+            Default {
+                FillRect $g 32 1 16 2 "#FFFFFF"
+                FillRect $g 32 3 16 1 "#A0A0A0"
+                StrokeRect $g 19 19 10 13 "#000000"
+            }
+        }
+    } finally {
+        $g.Dispose()
+    }
 }
 
 function ExportArmorItems($name, $spec) {
