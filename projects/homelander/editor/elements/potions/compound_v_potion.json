@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "compound_v_potion",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "V 复合药水",
+    "en_us": "compound v potion"
+  },
+  "description": "喝下后随机抽取祖国人系能力。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.030Z",
+  "type": "potion",
+  "properties": {
+    "potionKind": "drinkable",
+    "basePotion": "minecraft:awkward",
+    "effects": [
+      {
+        "effect": "homelander_maomao:homelander_power",
+        "duration": 2400,
+        "amplifier": 0,
+        "visible": true,
+        "showIcon": true
+      }
+    ],
+    "color": "#f2c94c",
+    "creativeTab": "homelander_maomao_tab"
+  }
+}

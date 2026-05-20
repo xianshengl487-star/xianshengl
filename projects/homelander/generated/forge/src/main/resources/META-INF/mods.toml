@@ -1,0 +1,9 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="Fan-made / non-commercial draft"
+[[mods]]
+modId="homelander_maomao"
+version="1.0.0"
+displayName="祖国人系能力模组"
+authors="maomao + BlockForge Studio"
+description='''原创祖国人风格的 Forge 1.20.1 模组：血清随机觉醒、热视线、飞行、战衣、Boss 形态与能量系统。'''

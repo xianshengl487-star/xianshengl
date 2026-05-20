@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "combat",
+  "pattern": [
+    "IRI",
+    "CSC",
+    " G "
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "C": {
+      "item": "homelander_maomao:vought_power_core"
+    },
+    "S": {
+      "item": "homelander_maomao:v_power_shard"
+    },
+    "G": {
+      "item": "homelander_maomao:vought_rifle"
+    }
+  },
+  "result": {
+    "item": "homelander_maomao:suppressor_rifle",
+    "count": 1
+  }
+}

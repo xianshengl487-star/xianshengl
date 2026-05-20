@@ -1,0 +1,25 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "equipment",
+  "ingredients": [
+    {
+      "item": "homelander_maomao:vought_power_core"
+    },
+    {
+      "item": "minecraft:diamond_chestplate"
+    },
+    {
+      "item": "minecraft:glass"
+    },
+    {
+      "item": "homelander_maomao:invisible_skin_sample"
+    },
+    {
+      "item": "minecraft:light_blue_dye"
+    }
+  ],
+  "result": {
+    "item": "homelander_maomao:translucent_chestplate",
+    "count": 1
+  }
+}

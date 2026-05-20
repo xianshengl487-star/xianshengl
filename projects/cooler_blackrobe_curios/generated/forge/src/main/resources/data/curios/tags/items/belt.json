@@ -1,0 +1,14 @@
+{
+    "replace":  false,
+    "values":  [
+                   "cooler_blackrobe_curios:veil_clasp",
+                   "cooler_blackrobe_curios:obsidian_latch",
+                   "cooler_blackrobe_curios:warden_buckle",
+                   "cooler_blackrobe_curios:leviathan_chain",
+                   "cooler_blackrobe_curios:kinetic_heel_anchor",
+                   "cooler_blackrobe_curios:pressure_king_belt",
+                   "cooler_blackrobe_curios:harbinger_storm_belt",
+                   "cooler_blackrobe_curios:shockguard_belt",
+                   "cooler_blackrobe_curios:aegis_servo_buckle"
+               ]
+}

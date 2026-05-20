@@ -1,0 +1,48 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="Fan-made / non-commercial addon"
+
+[[mods]]
+modId="cooler_blackrobe_curios"
+version="1.0.0"
+displayName="更酷炫的黑袍饰品"
+authors="maomao + BlockForge Studio"
+description='''
+祖国人能力模组的独立 Curios 饰品附属包。
+加入五件黑袍风格饰品，并使用 Curios 槽位装备；Homelander 主模组为必需前置，灾变 Cataclysm 为可选联动合成材料来源。
+'''
+
+[[dependencies.cooler_blackrobe_curios]]
+modId="forge"
+mandatory=true
+versionRange="[47,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cooler_blackrobe_curios]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.21)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.cooler_blackrobe_curios]]
+modId="homelander_maomao"
+mandatory=true
+versionRange="[1.0.0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.cooler_blackrobe_curios]]
+modId="curios"
+mandatory=true
+versionRange="[5.0.0,)"
+ordering="AFTER"
+side="BOTH"
+
+[[dependencies.cooler_blackrobe_curios]]
+modId="cataclysm"
+mandatory=false
+versionRange="[2.0.0,)"
+ordering="AFTER"
+side="BOTH"

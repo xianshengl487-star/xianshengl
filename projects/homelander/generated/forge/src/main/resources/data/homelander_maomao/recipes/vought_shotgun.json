@@ -1,0 +1,28 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    "IIR",
+    "ICI",
+    " SS"
+  ],
+  "key": {
+    "I": {
+      "tag": "forge:ingots/iron"
+    },
+    "R": {
+      "item": "minecraft:gunpowder"
+    },
+    "C": {
+      "item": "homelander_maomao:vought_power_core"
+    },
+    "S": {
+      "item": "minecraft:stick"
+    }
+  },
+  "result": {
+    "item": "homelander_maomao:vought_shotgun",
+    "count": 1
+  },
+  "show_notification": true
+}

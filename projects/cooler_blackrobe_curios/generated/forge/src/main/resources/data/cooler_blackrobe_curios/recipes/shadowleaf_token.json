@@ -1,0 +1,26 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ABA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:chain"
+                      },
+                "B":  {
+                          "item":  "minecraft:prismarine_crystals"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:shadowleaf_token",
+                   "count":  1
+               }
+}

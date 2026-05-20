@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "homelander_maomao:v_stabilizer_patch"
+    },
+    {
+      "item": "homelander_maomao:v_power_shard"
+    },
+    {
+      "item": "minecraft:golden_apple"
+    },
+    {
+      "item": "minecraft:ghast_tear"
+    }
+  ],
+  "result": {
+    "item": "homelander_maomao:regeneration_booster",
+    "count": 2
+  }
+}

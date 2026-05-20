@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "heat_vision_beam",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "热视线光束",
+    "en_us": "heat vision beam"
+  },
+  "description": "发射热视线特效的 /function 脚本。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.033Z",
+  "type": "function",
+  "properties": {
+    "commands": "particle minecraft:flame ^ ^1.55 ^1 0 0 0 0.02 8 force @a\nparticle minecraft:end_rod ^ ^1.55 ^2 0 0 0 0.02 8 force @a\nparticle minecraft:flame ^ ^1.55 ^3 0 0 0 0.02 8 force @a\nplaysound minecraft:entity.blaze.shoot player @a ~ ~ ~ 0.9 1.4"
+  }
+}

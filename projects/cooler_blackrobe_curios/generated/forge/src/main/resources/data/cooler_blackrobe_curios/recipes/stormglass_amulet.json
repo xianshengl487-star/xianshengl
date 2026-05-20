@@ -1,0 +1,26 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ABA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:quartz"
+                      },
+                "B":  {
+                          "item":  "minecraft:echo_shard"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:v_stabilizer_patch"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:stormglass_amulet",
+                   "count":  1
+               }
+}

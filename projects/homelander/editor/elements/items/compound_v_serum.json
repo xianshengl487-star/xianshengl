@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "compound_v_serum",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "V 复合血清",
+    "en_us": "compound v serum"
+  },
+  "description": "饮用后随机获得祖国人系能力的核心血清。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.018Z",
+  "type": "item",
+  "properties": {
+    "itemKind": "food",
+    "maxStackSize": 16,
+    "rarity": "epic",
+    "tier": "IRON",
+    "attackDamage": 4,
+    "attackSpeed": -2.4,
+    "useDuration": 32,
+    "useAnimation": "none",
+    "enchantmentValue": 1,
+    "canRepair": true,
+    "ammoItem": "",
+    "ammoPerShot": 1,
+    "magazineSize": 1,
+    "reloadTicks": 20,
+    "projectileDamage": 2,
+    "projectileSpeed": 3,
+    "projectileSpread": 1,
+    "shotCount": 1,
+    "foodNutrition": 0,
+    "foodSaturation": 0,
+    "foodIsMeat": false,
+    "alwaysEat": true,
+    "fireResistant": false,
+    "creativeTab": "homelander_maomao_tab",
+    "model": "compound_v_serum_model",
+    "texture": "compound_v_serum",
+    "rightClickLogic": "item:compound_v_serum",
+    "description": "饮用后随机获得祖国人系能力的核心血清。"
+  }
+}

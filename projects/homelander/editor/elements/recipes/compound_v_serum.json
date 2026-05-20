@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "compound_v_serum",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "V 复合血清配方",
+    "en_us": "compound v serum"
+  },
+  "description": "合成 V 复合血清的配方。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.036Z",
+  "type": "recipe",
+  "properties": {
+    "recipeType": "shapeless",
+    "category": "misc",
+    "ingredients": [
+      "minecraft:glass_bottle",
+      "minecraft:nether_star",
+      "#forge:dusts/redstone",
+      "#forge:gems/diamond"
+    ],
+    "result": "homelander_maomao:compound_v_serum",
+    "count": 2
+  }
+}

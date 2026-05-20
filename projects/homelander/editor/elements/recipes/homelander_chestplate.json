@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "homelander_chestplate",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "祖国人战衣配方",
+    "en_us": "homelander chestplate"
+  },
+  "description": "合成祖国人战衣套装的核心胸甲。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.038Z",
+  "type": "recipe",
+  "properties": {
+    "recipeType": "shapeless",
+    "category": "misc",
+    "ingredients": [
+      "homelander_maomao:vought_power_core",
+      "minecraft:diamond_chestplate",
+      "minecraft:red_banner",
+      "#forge:ingots/gold"
+    ],
+    "result": "homelander_maomao:homelander_chestplate",
+    "count": 1
+  }
+}

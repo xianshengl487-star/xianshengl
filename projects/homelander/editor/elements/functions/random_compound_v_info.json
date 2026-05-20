@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "random_compound_v_info",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "V 复合随机情报",
+    "en_us": "random compound v info"
+  },
+  "description": "显示本次 V 血清结果提示的 /function 脚本。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.035Z",
+  "type": "function",
+  "properties": {
+    "commands": "tellraw @p {\"text\":\"本次 V 血清结果：Forge 祖国人系能力随机觉醒，可能出现 A-Train、星光、梅芙、黑袍或 Boss 形态。\",\"color\":\"yellow\"}"
+  }
+}

@@ -1,0 +1,26 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ABA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:leather"
+                      },
+                "B":  {
+                          "item":  "minecraft:iron_ingot"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:kinetic_focus_ring"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:shockguard_belt",
+                   "count":  1
+               }
+}

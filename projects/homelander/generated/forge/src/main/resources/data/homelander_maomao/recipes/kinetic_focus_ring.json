@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "AGA",
+    "GVG",
+    "AGA"
+  ],
+  "key": {
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "V": {
+      "item": "homelander_maomao:v_power_shard"
+    }
+  },
+  "result": {
+    "item": "homelander_maomao:kinetic_focus_ring",
+    "count": 1
+  }
+}

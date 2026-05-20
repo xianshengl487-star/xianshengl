@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "misc",
+  "ingredients": [
+    {
+      "item": "homelander_maomao:starlight_charge"
+    },
+    {
+      "item": "homelander_maomao:vought_power_core"
+    },
+    {
+      "item": "minecraft:amethyst_shard"
+    },
+    {
+      "item": "minecraft:glowstone_dust"
+    }
+  ],
+  "result": {
+    "item": "homelander_maomao:starlight_amplifier",
+    "count": 1
+  }
+}

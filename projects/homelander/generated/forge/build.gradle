@@ -1,0 +1,35 @@
+plugins { id 'net.minecraftforge.gradle' version '[6.0,6.2)' }
+
+group='com.blockforge.homelander_maomao'
+version='1.0.0'
+
+java { toolchain.languageVersion = JavaLanguageVersion.of(17) }
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+minecraft { mappings channel: 'official', version: '1.20.1' }
+
+repositories {
+    maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }
+    maven { name = 'Aliyun Central'; url = uri('https://maven.aliyun.com/repository/central') }
+    maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }
+    maven {
+        name = 'CurseMaven'
+        url = uri('https://cursemaven.com')
+        content { includeGroup 'curse.maven' }
+    }
+    mavenCentral()
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.20.1-47.2.0'
+    compileOnly 'org.lwjgl:lwjgl:3.3.1'
+    compileOnly 'org.lwjgl:lwjgl-glfw:3.3.1'
+    compileOnly 'org.joml:joml:1.10.5'
+    compileOnly 'com.mojang:brigadier:1.1.8'
+    compileOnly 'io.netty:netty-buffer:4.1.82.Final'
+}
+
+jar { manifest { attributes(['Specification-Title': 'homelander_maomao', 'Specification-Version': '1', 'Implementation-Title': project.name, 'Implementation-Version': project.version]) } }

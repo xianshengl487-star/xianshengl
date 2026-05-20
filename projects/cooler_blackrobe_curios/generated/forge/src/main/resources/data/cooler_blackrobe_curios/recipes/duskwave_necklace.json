@@ -1,0 +1,26 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ABA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:chain"
+                      },
+                "B":  {
+                          "item":  "minecraft:prismarine_crystals"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:v_stabilizer_patch"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:duskwave_necklace",
+                   "count":  1
+               }
+}

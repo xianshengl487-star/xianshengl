@@ -1,0 +1,7 @@
+{
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "homelander_maomao:item/anomaly_v_serum"
+  },
+  "display": {}
+}

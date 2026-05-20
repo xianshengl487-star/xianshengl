@@ -1,0 +1,35 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ACA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:quartz"
+                      },
+                "B":  {
+                          "item":  "minecraft:echo_shard"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:chrono_tuning_chip"
+                      },
+                "C":  {
+                          "item":  "cataclysm:ancient_metal_ingot"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:bloodthirst_idol",
+                   "count":  1
+               },
+    "conditions":  [
+                       {
+                           "type":  "forge:mod_loaded",
+                           "modid":  "cataclysm"
+                       }
+                   ]
+}

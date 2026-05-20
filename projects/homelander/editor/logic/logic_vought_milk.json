@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "0.1.0",
+  "graphId": "logic_vought_milk",
+  "name": "沃特能量奶逻辑",
+  "eventType": "item_right_click",
+  "boundElement": "item:vought_milk",
+  "enabled": true,
+  "targetLoaders": [
+    "forge"
+  ],
+  "nodes": [
+    {
+      "nodeId": "event_vought_milk",
+      "nodeType": "event.item_right_click",
+      "title": "事件：右键物品",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {},
+      "required": [],
+      "diagnostics": [],
+      "position": {
+        "x": 60,
+        "y": 140
+      }
+    },
+    {
+      "nodeId": "cooldown_vought_milk",
+      "nodeType": "condition.cooldown_ready",
+      "title": "判断：冷却结束",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "true_out",
+          "name": "是",
+          "type": "exec"
+        },
+        {
+          "id": "false_out",
+          "name": "否",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "milk_refuel"
+      },
+      "required": [
+        "cooldownId"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 280,
+        "y": 120
+      }
+    },
+    {
+      "nodeId": "command_vought_milk",
+      "nodeType": "action.execute_command",
+      "title": "执行命令",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "command": "function homelander_maomao:milk_refuel"
+      },
+      "required": [
+        "command"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "start_vought_milk",
+      "nodeType": "action.start_cooldown",
+      "title": "启动冷却",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "milk_refuel",
+        "ticks": 120
+      },
+      "required": [
+        "cooldownId",
+        "ticks"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 780,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "denied_vought_milk",
+      "nodeType": "action.send_message",
+      "title": "发送聊天消息",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "text": "能量奶仍在冷却中。"
+      },
+      "required": [
+        "text"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 240
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_vought_milk_1",
+      "source": "event_vought_milk",
+      "sourceHandle": "exec_out",
+      "target": "cooldown_vought_milk",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_vought_milk_2",
+      "source": "cooldown_vought_milk",
+      "sourceHandle": "true_out",
+      "target": "command_vought_milk",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_vought_milk_3",
+      "source": "command_vought_milk",
+      "sourceHandle": "exec_out",
+      "target": "start_vought_milk",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_vought_milk_4",
+      "source": "cooldown_vought_milk",
+      "sourceHandle": "false_out",
+      "target": "denied_vought_milk",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    }
+  ],
+  "variables": [
+    {
+      "id": "energy",
+      "name": "能量值",
+      "type": "number",
+      "defaultValue": 100,
+      "scope": "player_persistent"
+    },
+    {
+      "id": "cooldown",
+      "name": "冷却",
+      "type": "number",
+      "defaultValue": 120,
+      "scope": "local"
+    }
+  ],
+  "resources": [],
+  "diagnostics": [],
+  "generatedCodeCache": {},
+  "editorView": {
+    "zoom": 1,
+    "position": {
+      "x": 0,
+      "y": 0
+    },
+    "groups": []
+  }
+}

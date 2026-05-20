@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "super_strength",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "超级力量",
+    "en_us": "super strength"
+  },
+  "description": "显著提升近战输出与推力。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.026Z",
+  "type": "mob_effect",
+  "properties": {
+    "category": "beneficial",
+    "color": "#f59e0b",
+    "instant": false,
+    "ambient": false,
+    "visible": true,
+    "showIcon": true,
+    "description": "显著提升近战输出与推力。"
+  }
+}

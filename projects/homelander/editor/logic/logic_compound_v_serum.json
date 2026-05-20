@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "0.1.0",
+  "graphId": "logic_compound_v_serum",
+  "name": "V 复合血清逻辑",
+  "eventType": "item_right_click",
+  "boundElement": "item:compound_v_serum",
+  "enabled": true,
+  "targetLoaders": [
+    "forge"
+  ],
+  "nodes": [
+    {
+      "nodeId": "event_compound_v_serum",
+      "nodeType": "event.item_right_click",
+      "title": "事件：右键物品",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {},
+      "required": [],
+      "diagnostics": [],
+      "position": {
+        "x": 60,
+        "y": 140
+      }
+    },
+    {
+      "nodeId": "cooldown_compound_v_serum",
+      "nodeType": "condition.cooldown_ready",
+      "title": "判断：冷却结束",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "true_out",
+          "name": "是",
+          "type": "exec"
+        },
+        {
+          "id": "false_out",
+          "name": "否",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "compound_v_serum"
+      },
+      "required": [
+        "cooldownId"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 280,
+        "y": 120
+      }
+    },
+    {
+      "nodeId": "command_compound_v_serum",
+      "nodeType": "action.execute_command",
+      "title": "执行命令",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "command": "function homelander_maomao:random_compound_v_info"
+      },
+      "required": [
+        "command"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "start_compound_v_serum",
+      "nodeType": "action.start_cooldown",
+      "title": "启动冷却",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "compound_v_serum",
+        "ticks": 600
+      },
+      "required": [
+        "cooldownId",
+        "ticks"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 780,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "denied_compound_v_serum",
+      "nodeType": "action.send_message",
+      "title": "发送聊天消息",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "text": "冷却中，请稍后再试。"
+      },
+      "required": [
+        "text"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 240
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_compound_v_serum_1",
+      "source": "event_compound_v_serum",
+      "sourceHandle": "exec_out",
+      "target": "cooldown_compound_v_serum",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_compound_v_serum_2",
+      "source": "cooldown_compound_v_serum",
+      "sourceHandle": "true_out",
+      "target": "command_compound_v_serum",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_compound_v_serum_3",
+      "source": "command_compound_v_serum",
+      "sourceHandle": "exec_out",
+      "target": "start_compound_v_serum",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_compound_v_serum_4",
+      "source": "cooldown_compound_v_serum",
+      "sourceHandle": "false_out",
+      "target": "denied_compound_v_serum",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    }
+  ],
+  "variables": [
+    {
+      "id": "energy",
+      "name": "能量值",
+      "type": "number",
+      "defaultValue": 100,
+      "scope": "player_persistent"
+    },
+    {
+      "id": "cooldown",
+      "name": "冷却",
+      "type": "number",
+      "defaultValue": 600,
+      "scope": "local"
+    }
+  ],
+  "resources": [],
+  "diagnostics": [],
+  "generatedCodeCache": {},
+  "editorView": {
+    "zoom": 1,
+    "position": {
+      "x": 0,
+      "y": 0
+    },
+    "groups": []
+  }
+}

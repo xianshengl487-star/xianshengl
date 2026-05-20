@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "boss_form",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "Boss 形态",
+    "en_us": "boss form"
+  },
+  "description": "进入压制型 Boss 状态，获得更高属性。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.027Z",
+  "type": "mob_effect",
+  "properties": {
+    "category": "beneficial",
+    "color": "#b91c1c",
+    "instant": false,
+    "ambient": false,
+    "visible": true,
+    "showIcon": true,
+    "description": "进入压制型 Boss 状态，获得更高属性。"
+  }
+}

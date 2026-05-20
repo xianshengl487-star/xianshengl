@@ -1,0 +1,6 @@
+{
+    "parent":  "minecraft:item/generated",
+    "textures":  {
+                     "layer0":  "cooler_blackrobe_curios:item/cinder_loop"
+                 }
+}

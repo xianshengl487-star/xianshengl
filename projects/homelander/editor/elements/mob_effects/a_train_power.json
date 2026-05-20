@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "a_train_power",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "A-Train 速度",
+    "en_us": "a train power"
+  },
+  "description": "偏向爆发移动与冲刺的速度强化。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.028Z",
+  "type": "mob_effect",
+  "properties": {
+    "category": "beneficial",
+    "color": "#60a5fa",
+    "instant": false,
+    "ambient": false,
+    "visible": true,
+    "showIcon": true,
+    "description": "偏向爆发移动与冲刺的速度强化。"
+  }
+}

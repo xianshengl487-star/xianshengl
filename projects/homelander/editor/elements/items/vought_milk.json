@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "vought_milk",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "沃特能量奶",
+    "en_us": "vought milk"
+  },
+  "description": "快速补充生命与能量的恢复饮品。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.019Z",
+  "type": "item",
+  "properties": {
+    "itemKind": "food",
+    "maxStackSize": 16,
+    "rarity": "rare",
+    "tier": "IRON",
+    "attackDamage": 4,
+    "attackSpeed": -2.4,
+    "useDuration": 32,
+    "useAnimation": "none",
+    "enchantmentValue": 1,
+    "canRepair": true,
+    "ammoItem": "",
+    "ammoPerShot": 1,
+    "magazineSize": 1,
+    "reloadTicks": 20,
+    "projectileDamage": 2,
+    "projectileSpeed": 3,
+    "projectileSpread": 1,
+    "shotCount": 1,
+    "foodNutrition": 4,
+    "foodSaturation": 0.6,
+    "foodIsMeat": false,
+    "alwaysEat": true,
+    "fireResistant": false,
+    "creativeTab": "homelander_maomao_tab",
+    "model": "vought_milk_model",
+    "texture": "vought_milk",
+    "rightClickLogic": "item:vought_milk",
+    "description": "快速补充生命与能量的恢复饮品。"
+  }
+}

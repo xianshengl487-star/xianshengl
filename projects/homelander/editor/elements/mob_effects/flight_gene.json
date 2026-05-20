@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "flight_gene",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "飞行基因",
+    "en_us": "flight gene"
+  },
+  "description": "赋予飞行与滞空能力的增益状态。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.025Z",
+  "type": "mob_effect",
+  "properties": {
+    "category": "beneficial",
+    "color": "#4aa3ff",
+    "instant": false,
+    "ambient": false,
+    "visible": true,
+    "showIcon": true,
+    "description": "赋予飞行与滞空能力的增益状态。"
+  }
+}

@@ -1,0 +1,11 @@
+pluginManagement {
+    repositories {
+        maven { name = 'Aliyun Gradle Plugin'; url = uri('https://maven.aliyun.com/repository/gradle-plugin') }
+        maven { name = 'Aliyun Public'; url = uri('https://maven.aliyun.com/repository/public') }
+        maven { name = 'MinecraftForge Official'; url = uri('https://maven.minecraftforge.net/') }
+        gradlePluginPortal()
+        mavenCentral()
+    }
+}
+
+rootProject.name='cooler_blackrobe_curios'

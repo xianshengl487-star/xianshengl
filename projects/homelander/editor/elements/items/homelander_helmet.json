@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "homelander_helmet",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "祖国人头盔",
+    "en_us": "homelander helmet"
+  },
+  "description": "祖国人战衣套装的头部部件。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.022Z",
+  "type": "item",
+  "properties": {
+    "itemKind": "armor_helmet",
+    "maxStackSize": 1,
+    "rarity": "epic",
+    "tier": "NETHERITE",
+    "attackDamage": 4,
+    "attackSpeed": -2.4,
+    "useDuration": 32,
+    "useAnimation": "none",
+    "enchantmentValue": 28,
+    "canRepair": true,
+    "ammoItem": "",
+    "ammoPerShot": 1,
+    "magazineSize": 1,
+    "reloadTicks": 20,
+    "projectileDamage": 2,
+    "projectileSpeed": 3,
+    "projectileSpread": 1,
+    "shotCount": 1,
+    "foodNutrition": 4,
+    "foodSaturation": 0.3,
+    "foodIsMeat": false,
+    "alwaysEat": false,
+    "fireResistant": false,
+    "creativeTab": "homelander_maomao_tab",
+    "model": "homelander_helmet_model",
+    "durability": 900,
+    "texture": "homelander_helmet"
+  }
+}

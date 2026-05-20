@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "heat_vision_focus",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "热视线聚焦器",
+    "en_us": "heat vision focus"
+  },
+  "description": "让角色释放热视线并控制冷却节奏的右键工具。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.021Z",
+  "type": "tool",
+  "properties": {
+    "itemKind": "magic_wand",
+    "maxStackSize": 1,
+    "rarity": "epic",
+    "tier": "NETHERITE",
+    "attackDamage": 8,
+    "attackSpeed": -2.2,
+    "useDuration": 16,
+    "useAnimation": "bow",
+    "enchantmentValue": 22,
+    "canRepair": true,
+    "ammoItem": "",
+    "ammoPerShot": 1,
+    "magazineSize": 1,
+    "reloadTicks": 20,
+    "projectileDamage": 2,
+    "projectileSpeed": 3,
+    "projectileSpread": 1,
+    "shotCount": 1,
+    "creativeTab": "homelander_maomao_tab",
+    "model": "heat_vision_focus_model",
+    "durability": 800,
+    "texture": "heat_vision_focus",
+    "rightClickLogic": "tool:heat_vision_focus"
+  }
+}

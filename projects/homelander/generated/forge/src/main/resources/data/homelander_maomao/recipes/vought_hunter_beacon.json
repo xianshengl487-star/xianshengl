@@ -1,0 +1,30 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "RCR",
+    "SBS",
+    "RIR"
+  ],
+  "key": {
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "C": {
+      "item": "homelander_maomao:vought_power_core"
+    },
+    "S": {
+      "item": "homelander_maomao:v_power_shard"
+    },
+    "B": {
+      "item": "minecraft:beacon"
+    },
+    "I": {
+      "item": "minecraft:iron_block"
+    }
+  },
+  "result": {
+    "item": "homelander_maomao:vought_hunter_beacon",
+    "count": 2
+  }
+}

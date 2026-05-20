@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "DGD",
+    "GVG",
+    "DGD"
+  ],
+  "key": {
+    "D": {
+      "item": "minecraft:diamond"
+    },
+    "G": {
+      "item": "minecraft:glowstone_dust"
+    },
+    "V": {
+      "item": "homelander_maomao:vought_power_core"
+    }
+  },
+  "result": {
+    "item": "homelander_maomao:v_amplifier_core",
+    "count": 1
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "0.1.0",
+  "projectId": "homelander_maomao",
+  "displayName": "祖国人系能力模组",
+  "modId": "homelander_maomao",
+  "namespace": "homelander_maomao",
+  "packageName": "com.blockforge.homelander_maomao",
+  "author": "maomao + BlockForge Studio",
+  "description": "原创祖国人风格的 Forge 1.20.1 模组：血清随机觉醒、热视线、飞行、战衣、Boss 形态与能量系统。",
+  "minecraftVersion": "1.20.1",
+  "javaVersion": "17",
+  "targetLoaders": [
+    "forge"
+  ],
+  "primaryLoader": "forge",
+  "license": "Fan-made / non-commercial draft",
+  "createdAt": "2026-05-19T04:50:09.163Z",
+  "updatedAt": "2026-05-19T05:01:58.007Z",
+  "compatibility": {
+    "externalMods": [],
+    "acceptedNamespaces": [],
+    "allowExternalTags": true
+  },
+  "features": {
+    "datapack": true,
+    "resourcepack": true,
+    "aiAssistant": true,
+    "advancedCodeMode": true
+  },
+  "paths": {
+    "editor": "editor",
+    "generated": "generated",
+    "exports": "exports",
+    "snapshots": "editor/snapshots"
+  }
+}

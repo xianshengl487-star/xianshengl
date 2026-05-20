@@ -1,0 +1,35 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ACA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:chain"
+                      },
+                "B":  {
+                          "item":  "minecraft:prismarine_crystals"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:kinetic_focus_ring"
+                      },
+                "C":  {
+                          "item":  "cataclysm:abyssal_egg"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:leviathan_depth_pendant",
+                   "count":  1
+               },
+    "conditions":  [
+                       {
+                           "type":  "forge:mod_loaded",
+                           "modid":  "cataclysm"
+                       }
+                   ]
+}

@@ -1,0 +1,221 @@
+{
+  "schemaVersion": "0.1.0",
+  "graphId": "logic_heat_vision_focus",
+  "name": "热视线聚焦器逻辑",
+  "eventType": "item_right_click",
+  "boundElement": "tool:heat_vision_focus",
+  "enabled": true,
+  "targetLoaders": [
+    "forge"
+  ],
+  "nodes": [
+    {
+      "nodeId": "event_heat_vision_focus",
+      "nodeType": "event.item_right_click",
+      "title": "事件：右键物品",
+      "inputs": [],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {},
+      "required": [],
+      "diagnostics": [],
+      "position": {
+        "x": 60,
+        "y": 140
+      }
+    },
+    {
+      "nodeId": "cooldown_heat_vision_focus",
+      "nodeType": "condition.cooldown_ready",
+      "title": "判断：冷却结束",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "true_out",
+          "name": "是",
+          "type": "exec"
+        },
+        {
+          "id": "false_out",
+          "name": "否",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "heat_vision"
+      },
+      "required": [
+        "cooldownId"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 280,
+        "y": 120
+      }
+    },
+    {
+      "nodeId": "command_heat_vision_focus",
+      "nodeType": "action.execute_command",
+      "title": "执行命令",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "command": "function homelander_maomao:heat_vision_beam"
+      },
+      "required": [
+        "command"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "start_heat_vision_focus",
+      "nodeType": "action.start_cooldown",
+      "title": "启动冷却",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "cooldownId": "heat_vision",
+        "ticks": 80
+      },
+      "required": [
+        "cooldownId",
+        "ticks"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 780,
+        "y": 80
+      }
+    },
+    {
+      "nodeId": "denied_heat_vision_focus",
+      "nodeType": "action.send_message",
+      "title": "发送聊天消息",
+      "inputs": [
+        {
+          "id": "exec_in",
+          "name": "执行",
+          "type": "exec"
+        }
+      ],
+      "outputs": [
+        {
+          "id": "exec_out",
+          "name": "继续",
+          "type": "exec"
+        }
+      ],
+      "params": {
+        "text": "热视线尚在冷却中。"
+      },
+      "required": [
+        "text"
+      ],
+      "diagnostics": [],
+      "position": {
+        "x": 530,
+        "y": 240
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge_heat_vision_focus_1",
+      "source": "event_heat_vision_focus",
+      "sourceHandle": "exec_out",
+      "target": "cooldown_heat_vision_focus",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_heat_vision_focus_2",
+      "source": "cooldown_heat_vision_focus",
+      "sourceHandle": "true_out",
+      "target": "command_heat_vision_focus",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_heat_vision_focus_3",
+      "source": "command_heat_vision_focus",
+      "sourceHandle": "exec_out",
+      "target": "start_heat_vision_focus",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    },
+    {
+      "id": "edge_heat_vision_focus_4",
+      "source": "cooldown_heat_vision_focus",
+      "sourceHandle": "false_out",
+      "target": "denied_heat_vision_focus",
+      "targetHandle": "exec_in",
+      "type": "exec"
+    }
+  ],
+  "variables": [
+    {
+      "id": "energy",
+      "name": "热量",
+      "type": "number",
+      "defaultValue": 100,
+      "scope": "player_persistent"
+    },
+    {
+      "id": "cooldown",
+      "name": "冷却",
+      "type": "number",
+      "defaultValue": 80,
+      "scope": "local"
+    }
+  ],
+  "resources": [],
+  "diagnostics": [],
+  "generatedCodeCache": {},
+  "editorView": {
+    "zoom": 1,
+    "position": {
+      "x": 0,
+      "y": 0
+    },
+    "groups": []
+  }
+}

@@ -1,0 +1,13 @@
+{
+    "replace":  false,
+    "values":  [
+                   "cooler_blackrobe_curios:shadowleaf_token",
+                   "cooler_blackrobe_curios:duskwave_necklace",
+                   "cooler_blackrobe_curios:eclipse_gorget",
+                   "cooler_blackrobe_curios:polar_vial_locket",
+                   "cooler_blackrobe_curios:leviathan_depth_pendant",
+                   "cooler_blackrobe_curios:voidcrown_torque",
+                   "cooler_blackrobe_curios:blackstar_locket",
+                   "cooler_blackrobe_curios:leviathan_flux_collar"
+               ]
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "vought_tower_arena",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "沃特 Boss 竞技场",
+    "en_us": "vought tower arena"
+  },
+  "description": "用于生成沃特风格 Boss 场地的建筑蓝图。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.039Z",
+  "type": "structure",
+  "properties": {
+    "structureKind": "tower",
+    "width": 11,
+    "depth": 11,
+    "height": 18,
+    "floorBlock": "minecraft:quartz_block",
+    "wallBlock": "minecraft:smooth_quartz",
+    "roofBlock": "minecraft:gold_block",
+    "accentBlock": "minecraft:red_concrete",
+    "glassBlock": "minecraft:blue_stained_glass_pane",
+    "doorBlock": "minecraft:iron_door",
+    "torchBlock": "minecraft:lantern",
+    "hollow": true,
+    "includeInterior": true,
+    "includeLights": true,
+    "includeLootChest": true
+  }
+}

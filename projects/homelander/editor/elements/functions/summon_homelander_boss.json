@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "summon_homelander_boss",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "祖国人 Boss 召唤",
+    "en_us": "summon homelander boss"
+  },
+  "description": "召唤祖国人 Boss 形态的 /function 脚本。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.034Z",
+  "type": "function",
+  "properties": {
+    "commands": "summon minecraft:vindicator ~ ~1 ~ {CustomName:'{\"text\":\"祖国人 Boss\",\"color\":\"gold\",\"bold\":true}',Health:220f,Attributes:[{Name:\"generic.max_health\",Base:220},{Name:\"generic.attack_damage\",Base:18},{Name:\"generic.movement_speed\",Base:0.42},{Name:\"generic.knockback_resistance\",Base:1}],ArmorItems:[{id:\"homelander_maomao:homelander_boots\",Count:1b},{id:\"homelander_maomao:homelander_leggings\",Count:1b},{id:\"homelander_maomao:homelander_chestplate\",Count:1b},{id:\"homelander_maomao:homelander_helmet\",Count:1b}],HandItems:[{id:\"homelander_maomao:heat_vision_focus\",Count:1b},{}],PersistenceRequired:1b}\ntellraw @a {\"text\":\"祖国人 Boss 已出现。\",\"color\":\"red\"}"
+  }
+}

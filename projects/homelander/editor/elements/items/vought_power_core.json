@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "vought_power_core",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "沃特动力核心",
+    "en_us": "vought power core"
+  },
+  "description": "为能力装置与高级配件提供能量的核心部件。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.020Z",
+  "type": "item",
+  "properties": {
+    "itemKind": "generic",
+    "maxStackSize": 16,
+    "rarity": "epic",
+    "tier": "IRON",
+    "attackDamage": 4,
+    "attackSpeed": -2.4,
+    "useDuration": 32,
+    "useAnimation": "none",
+    "enchantmentValue": 1,
+    "canRepair": true,
+    "ammoItem": "",
+    "ammoPerShot": 1,
+    "magazineSize": 1,
+    "reloadTicks": 20,
+    "projectileDamage": 2,
+    "projectileSpeed": 3,
+    "projectileSpread": 1,
+    "shotCount": 1,
+    "foodNutrition": 4,
+    "foodSaturation": 0.3,
+    "foodIsMeat": false,
+    "alwaysEat": false,
+    "fireResistant": false,
+    "creativeTab": "homelander_maomao_tab",
+    "model": "vought_power_core_model",
+    "texture": "vought_power_core",
+    "description": "为能力装置与高级配件提供能量的核心部件。"
+  }
+}

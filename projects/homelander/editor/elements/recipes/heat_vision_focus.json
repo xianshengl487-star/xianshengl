@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "heat_vision_focus",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "热视线聚焦器配方",
+    "en_us": "heat vision focus"
+  },
+  "description": "合成热视线聚焦器的配方。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.037Z",
+  "type": "recipe",
+  "properties": {
+    "recipeType": "shapeless",
+    "category": "misc",
+    "ingredients": [
+      "homelander_maomao:vought_power_core",
+      "minecraft:blaze_rod",
+      "#forge:gems/ruby"
+    ],
+    "result": "homelander_maomao:heat_vision_focus",
+    "count": 1
+  }
+}

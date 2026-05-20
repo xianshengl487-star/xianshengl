@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "ability_help",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "能力帮助",
+    "en_us": "ability help"
+  },
+  "description": "输出当前能力系统的使用说明。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.032Z",
+  "type": "function",
+  "properties": {
+    "commands": "tellraw @p {\"text\":\"祖国人系能力模组：V 血清会随机觉醒能力，热视线、飞行、战衣、Boss 形态都可获得。可通过 /function homelander_maomao:toggle_flight、/function homelander_maomao:heat_vision_beam、/function homelander_maomao:summon_homelander_boss 触发。\",\"color\":\"gold\"}"
+  }
+}

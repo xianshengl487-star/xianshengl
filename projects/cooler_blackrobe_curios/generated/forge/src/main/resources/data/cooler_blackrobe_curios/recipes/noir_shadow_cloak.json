@@ -1,0 +1,35 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ACA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:leather"
+                      },
+                "B":  {
+                          "item":  "minecraft:phantom_membrane"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:kinetic_focus_ring"
+                      },
+                "C":  {
+                          "item":  "cataclysm:cursium_ingot"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:noir_shadow_cloak",
+                   "count":  1
+               },
+    "conditions":  [
+                       {
+                           "type":  "forge:mod_loaded",
+                           "modid":  "cataclysm"
+                       }
+                   ]
+}

@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "vought_milk",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "沃特能量奶配方",
+    "en_us": "vought milk"
+  },
+  "description": "合成沃特能量奶的配方。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.037Z",
+  "type": "recipe",
+  "properties": {
+    "recipeType": "shapeless",
+    "category": "misc",
+    "ingredients": [
+      "minecraft:milk_bucket",
+      "minecraft:sugar",
+      "homelander_maomao:vought_power_core"
+    ],
+    "result": "homelander_maomao:vought_milk",
+    "count": 1
+  }
+}

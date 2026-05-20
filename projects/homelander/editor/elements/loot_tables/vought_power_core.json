@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "0.1.0",
+  "id": "vought_power_core",
+  "namespace": "homelander_maomao",
+  "displayName": {
+    "zh_cn": "沃特动力核心掉落",
+    "en_us": "vought power core"
+  },
+  "description": "用于产出沃特动力核心的掉落表。",
+  "tags": [],
+  "enabled": true,
+  "experimental": false,
+  "targetLoaders": [
+    "forge"
+  ],
+  "mcVersions": [
+    "1.20.1"
+  ],
+  "linkedResources": [],
+  "linkedLogic": [],
+  "generationStatus": "ready",
+  "diagnostics": [],
+  "createdAt": "2026-05-19T05:01:58.017Z",
+  "updatedAt": "2026-05-19T05:01:58.039Z",
+  "type": "loot_table",
+  "properties": {
+    "targetBlock": "ancient_debris",
+    "drop": "homelander_maomao:vought_power_core",
+    "minCount": 1,
+    "maxCount": 1
+  }
+}

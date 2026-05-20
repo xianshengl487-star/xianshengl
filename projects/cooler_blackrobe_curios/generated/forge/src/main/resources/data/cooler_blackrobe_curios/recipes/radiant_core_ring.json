@@ -1,0 +1,26 @@
+{
+    "type":  "minecraft:crafting_shaped",
+    "pattern":  [
+                    "ABA",
+                    "VPV",
+                    "ABA"
+                ],
+    "key":  {
+                "A":  {
+                          "item":  "minecraft:gold_ingot"
+                      },
+                "B":  {
+                          "item":  "minecraft:amethyst_shard"
+                      },
+                "V":  {
+                          "item":  "homelander_maomao:v_power_shard"
+                      },
+                "P":  {
+                          "item":  "homelander_maomao:vought_power_core"
+                      }
+            },
+    "result":  {
+                   "item":  "cooler_blackrobe_curios:radiant_core_ring",
+                   "count":  1
+               }
+}
